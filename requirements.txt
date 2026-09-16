@@ -1,0 +1,9 @@
+# The bootstrap needs only PyYAML. Everything else is stdlib.
+PyYAML>=6.0
+
+# Tests, labs, and the evaluator.
+pytest>=7.4.0
+
+# The labs and evaluator drive the sandbox-research implementation from a
+# sibling checkout of find-services-ai/mcp-idea-publisher. It is not a pip
+# dependency; point SANDBOX_RESEARCH_PATH at <checkout>/ideas/sandbox-research.

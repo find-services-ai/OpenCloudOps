@@ -1,0 +1,167 @@
+graph:
+  version: '1.0'
+  type: cloudops
+  description: CloudOps agent graph -- OpenCloudOps Playground
+  generated_from: .github/config/platform.yml
+  entrypoint: cloudops-orchestrator
+environments:
+  promotion_path:
+  - dev
+  - staging
+  - prod
+  autonomous:
+  - dev
+  human_gated: &id001
+  - staging
+  - prod
+nodes:
+  cloudops-orchestrator:
+    role: Intake, routing, and environment gating
+    zone:
+    - user-intent
+    - environment-selection
+    - ticket-linkage
+    tools:
+    - read
+    - search
+    - ask
+    risk_gate: none
+    rules:
+    - Never act on ['staging', 'prod'] without explicit human approval in the transcript.
+    - State which environment you are acting on before acting on it.
+  iac-builder:
+    role: terraform change authoring
+    zone:
+    - iac-files
+    - module-calls
+    - variable-wiring
+    tools:
+    - read
+    - edit
+    - search
+    - terminal
+    risk_gate: HIGH
+    rules:
+    - Every resource name carries its environment prefix (['d1', 's1', 'p1']).
+    - Never hardcode an account id, endpoint, or secret that belongs to another environment.
+  change-validator:
+    role: Correctness gate before any apply
+    zone:
+    - naming
+    - env-leak-detection
+    - plan-review
+    tools:
+    - read
+    - search
+    - grep
+    risk_gate: none
+    gate: must-pass
+    rules:
+    - A plan that touches a resource outside the named environment is a leak, not a diff.
+    - Reachable from iac-builder on every change. There is no fast path around this node.
+  sre-observer:
+    role: Post-deploy health and incident triage
+    zone:
+    - health-checks
+    - log-analysis
+    - incident-correlation
+    tools:
+    - read
+    - search
+    - terminal
+    risk_gate: none
+    rules:
+    - '''Flake'' is a conclusion, not a diagnosis. Name the mechanism or say you could not find it.'
+  mesh-researcher:
+    role: Governed cross-plane data research
+    zone:
+    - catalog-navigation
+    - sandboxed-reads
+    - evidence
+    tools:
+    - sandbox_create
+    - catalog_search
+    - catalog_describe
+    - catalog_lineage
+    - query_product
+    - unified_query
+    - research_plan
+    - research_run
+    - research_report
+    risk_gate: sandbox-policy
+    mcp_server: sandbox-research
+    rules:
+    - Open one sandbox per question, scoped to the narrowest plane set that answers it.
+    - A classification refusal means narrow the read, never widen the sandbox.
+    - Every finding cites an evidence digest. An uncited claim is deleted, not hedged.
+    - The sandbox is a policy and spend envelope with an audit ledger, not kernel isolation.
+    sandbox_defaults:
+      ttl_seconds: 1800
+      max_queries: 40
+      max_rows: 25000
+      allow_classifications:
+      - public
+      - internal
+      network: none
+    planes:
+    - bi
+    - lake
+    - warehouse
+edges:
+- from: cloudops-orchestrator
+  to: iac-builder
+  trigger: build | edit | scaffold
+- from: cloudops-orchestrator
+  to: sre-observer
+  trigger: triage | health | incident
+- from: iac-builder
+  to: change-validator
+  trigger: always
+  gate: must-pass
+- from: change-validator
+  to: iac-builder
+  trigger: violations && auto_fixable
+  max_cycles: 3
+- from: cloudops-orchestrator
+  to: mesh-researcher
+  trigger: why | investigate | cost | trend
+- from: sre-observer
+  to: mesh-researcher
+  trigger: incident needs historical context
+- from: mesh-researcher
+  to: cloudops-orchestrator
+  trigger: report delivered -> destroy sandbox
+error_handling:
+  decontamination:
+    on_node_failure: snapshot the failure, isolate it, do not carry the failed context forward
+    on_retry: reload configuration and state fresh; never reuse a stale plan
+    max_error_chain: 3
+    after_max: stop and escalate with the partial result and the failures named
+failure_policy:
+  default:
+    retry: 1
+    fallback: escalate to a human with what is known
+  per_node:
+    iac-builder:
+      retry: 2
+      fallback: propose the diff, do not apply
+    change-validator:
+      retry: 0
+      fallback: refuse the change
+    sre-observer:
+      retry: 1
+      fallback: escalate with raw evidence
+    mesh-researcher:
+      retry: 1
+      fallback: report the gap, do not guess
+governance:
+  human_gate:
+    enabled: true
+    environments: *id001
+    description: Changes to these environments require explicit human approval.
+  validation_gate:
+    enabled: true
+    description: change-validator must pass before any apply. No node may bypass it.
+  evidence_gate:
+    enabled: true
+    description: No data claim without a matching evidence digest.

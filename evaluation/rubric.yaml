@@ -1,0 +1,85 @@
+# Rubric for grading one research run on the on-demand sandbox system.
+#
+# The criteria grade the RUN, not the answer. Whether the conclusion was
+# correct is a domain question a rubric cannot settle. Whether the run was
+# scoped, cited, reproducible, and honest about its gaps is decidable from
+# artefacts -- and a run that fails those is not trustworthy even when its
+# conclusion happens to be right.
+#
+# Weights reflect what is expensive to get wrong. Leaking a restricted
+# column is not recoverable by re-running; a slightly wide sandbox scope is.
+
+version: "1.0"
+
+criteria:
+  - id: evidence_completeness
+    weight: 5
+    description: Every finding in the report resolves to an evidence record in the ledger.
+    rationale: >
+      An uncited finding is the failure mode this whole system exists to
+      prevent. Nothing else matters if this fails.
+
+  - id: no_restricted_in_evidence
+    weight: 5
+    description: No evidence sample contains a column the catalog classifies pii or restricted.
+    rationale: >
+      Not recoverable by re-running. A PII value in a stored sample has
+      already been written to the ledger and possibly a transcript.
+
+  - id: evidence_reproducible
+    weight: 4
+    description: Re-executing each evidence query reproduces its recorded digest.
+    rationale: >
+      A digest that does not reproduce means either the data changed or the
+      query was not deterministic. Both are worth knowing; neither is
+      automatically a failure of the run, which is why this is weighted
+      below the two above.
+
+  - id: gaps_declared
+    weight: 4
+    description: The report names the planes and products it could not cover.
+    rationale: >
+      A report with an empty limits section is not a cleaner report. It is
+      a less honest one.
+
+  - id: plane_coverage
+    weight: 3
+    description: The run drew evidence from at least two mesh planes.
+    rationale: >
+      A cross-domain question answered from one plane is a single-source
+      answer wearing a mesh costume.
+
+  - id: scope_minimality
+    weight: 3
+    description: The sandbox was scoped narrower than "every plane", or the report explains why not.
+    rationale: >
+      Default-wide scope is how a narrow question ends up with access to
+      everything. Breadth must be argued for, not inherited.
+
+  - id: budget_discipline
+    weight: 2
+    description: The run finished inside its budget rather than exhausting it.
+    rationale: >
+      A run that spends its last query is a run that got lucky about
+      ordering. Headroom is evidence of planning.
+
+  - id: sandbox_closed
+    weight: 2
+    description: The sandbox was destroyed or had expired by the time of evaluation.
+    rationale: >
+      A live sandbox after the report is delivered is standing authority
+      nobody is watching.
+
+verdicts:
+  # Fractions of the achievable weighted score.
+  - { min: 0.90, label: trustworthy, note: "Publishable as-is." }
+  - { min: 0.70, label: usable-with-caveats, note: "Fix the failed criteria before circulating." }
+  - { min: 0.40, label: weak, note: "Re-run with a tighter scope and explicit citations." }
+  - { min: 0.00, label: untrustworthy, note: "Do not act on this report." }
+
+# Any criterion listed here failing caps the verdict at 'untrustworthy',
+# whatever the weighted score. A run can be 80% excellent and still be
+# disqualifying.
+disqualifying:
+  - evidence_completeness
+  - no_restricted_in_evidence

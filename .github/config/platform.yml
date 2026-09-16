@@ -1,0 +1,58 @@
+platform:
+  name: OpenCloudOps Playground
+  application: cloudops
+  cloud: aws
+  iac_tool: terraform
+  compute: ecs_fargate
+  agent: claude-code
+environments:
+- name: dev
+  branch: dev
+  prefix: d1
+  risk_tier: LOW
+  autonomous: true
+- name: staging
+  branch: staging
+  prefix: s1
+  risk_tier: MEDIUM
+  autonomous: false
+- name: prod
+  branch: prod
+  prefix: p1
+  risk_tier: HIGH
+  autonomous: false
+promotion_path:
+- dev
+- staging
+- prod
+mesh:
+- plane: warehouse
+  connector: sql_warehouse
+  name: finops-warehouse
+  domain: finops
+  config:
+    database: ./mesh/warehouse/finops.db
+    classifications:
+      service_inventory.owner_email: pii
+- plane: lake
+  connector: object_lake
+  name: cloudops-lake
+  domain: cloudops
+  config:
+    root: ./mesh/lake
+    classifications:
+      deploy_events.approver_email: pii
+- plane: bi
+  connector: bi
+  name: exec-bi
+  domain: reporting
+  config:
+    definitions: ./mesh/bi/dashboards.yaml
+research_sandbox_defaults:
+  ttl_seconds: 1800
+  max_queries: 40
+  max_rows: 25000
+  allow_classifications:
+  - public
+  - internal
+  network: none

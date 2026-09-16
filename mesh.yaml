@@ -1,0 +1,20 @@
+connectors:
+- kind: sql_warehouse
+  name: finops-warehouse
+  domain: finops
+  config:
+    database: ./mesh/warehouse/finops.db
+    classifications:
+      service_inventory.owner_email: pii
+- kind: object_lake
+  name: cloudops-lake
+  domain: cloudops
+  config:
+    root: ./mesh/lake
+    classifications:
+      deploy_events.approver_email: pii
+- kind: bi
+  name: exec-bi
+  domain: reporting
+  config:
+    definitions: ./mesh/bi/dashboards.yaml
