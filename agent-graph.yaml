@@ -1,0 +1,184 @@
+# OpenCloudOps agent graph (v2.0)
+#
+# This file *is* the framework's behaviour. The runtime in
+# opencloudops/agentgraph.py reads it -- it hard-codes no pipeline. Editing an
+# edge here changes what the agents do; editing a risk_gate changes what they
+# are allowed to do without a human.
+#
+# Zone defence: every node owns a disjoint set of zones. The loader refuses a
+# graph where two nodes claim the same zone, because overlapping ownership is
+# how two agents end up fighting over one file.
+
+graph:
+  version: "2.0"
+  type: org
+  entry: orchestrator
+  description: >
+    Idea -> grounded resource graph -> guarded IaC -> SRE setup, with a bounded
+    repair loop and a human gate in front of anything that touches production.
+
+# Which model class each role uses. The runtime records this on every span, so
+# a cost regression is attributable to a role rather than to "the agent".
+models:
+  planner: claude-opus-5
+  builder: claude-opus-5
+  validator: claude-sonnet-5
+  observer: claude-sonnet-5
+  curator: claude-haiku-4-5
+
+nodes:
+  orchestrator:
+    role: Dispatch and context assembly
+    model: planner
+    zone: [routing, context-loading, user-intent, junction-questions]
+    tools: [read, search, recall-memory]
+    risk_gate: none
+    description: >
+      Turns a request into an intent plus a grounded resource graph. Asks the
+      junction questions whose answers would otherwise cause rework, and
+      recalls what this installation already learned about the service.
+
+  iac-builder:
+    role: Resource resolution and IaC generation
+    model: builder
+    zone: [resource-graph, naming, iac-emission, pattern-selection]
+    tools: [read, edit, emit-iac]
+    risk_gate: MEDIUM
+    description: >
+      Grounds every node in an approved pattern, applies enterprise naming and
+      tagging, and renders the plan into the requested IaC language. Gated at
+      MEDIUM: generating infrastructure code is a reviewable act.
+
+  iac-validator:
+    role: Correctness and policy gate
+    model: validator
+    zone: [policy-evaluation, env-leak-detection, lesson-scan, reference-integrity]
+    tools: [read, search, grep]
+    risk_gate: none
+    description: >
+      Runs the security baseline (guard.py) and the production lessons
+      (learner.py) over what the builder emitted. Hands work back to the
+      builder on a repairable finding, up to the cycle limit on that edge.
+
+  sre-observer:
+    role: SLO derivation, health and triage
+    model: observer
+    zone: [slo-derivation, alerting, health-checks, log-analysis, incident-triage]
+    tools: [read, search, mcp:cloud-logs, mcp:observability]
+    risk_gate: none
+    description: >
+      Read-only. Derives SLOs, alerts, dashboards and runbooks from the plan;
+      at incident time, classifies a signal and proposes remediation. Never
+      applies a change -- it hands one to release-executor.
+
+  knowledge-curator:
+    role: Memory and knowledge maintenance
+    model: curator
+    zone: [memories, runbooks, service-registry, cross-links]
+    tools: [read, edit]
+    risk_gate: LOW
+    description: >
+      Writes what was learned back to the memory store so the next run starts
+      from it. LOW gate: it edits knowledge, never infrastructure.
+
+  release-executor:
+    role: Environment promotion state machine
+    model: planner
+    zone: [environment-promotion, apply-gates, rollback, change-record]
+    tools: [read, edit]
+    risk_gate: MEDIUM
+    description: >
+      Produces the change record for a promotion: what moves, from where, who
+      approves, and the order to do it in. MEDIUM, not HIGH, and the distinction
+      is deliberate -- this node writes a document, and gating a document behind
+      the tier reserved for irreversible action would be theatre that teaches
+      people to click through gates.
+
+      HIGH is reserved for an apply capability this framework does not ship. The
+      ChatOps and HTTP planes refuse to grant HIGH at all, so if an apply is ever
+      added here it cannot be switched on quietly from a chat message or an API
+      call -- it has to be a deliberate change to this file and to those refusals.
+
+edges:
+  - from: orchestrator
+    to: iac-builder
+    trigger: plan | build | provision | scaffold | iac
+
+  - from: orchestrator
+    to: iac-validator
+    trigger: validate | check | policy | guard
+
+  - from: orchestrator
+    to: sre-observer
+    trigger: triage | health | diagnose | slo | observe
+
+  - from: orchestrator
+    to: knowledge-curator
+    trigger: learn | remember | recall
+
+  - from: orchestrator
+    to: release-executor
+    trigger: promote | apply | release
+
+  # The builder never ships its own output: the validator decides.
+  - from: iac-builder
+    to: iac-validator
+    trigger: always
+    gate: must-pass
+
+  # Bounded repair loop. Three cycles, then escalate rather than thrash.
+  - from: iac-validator
+    to: iac-builder
+    trigger: violations_repairable
+    max_cycles: 3
+
+  - from: iac-validator
+    to: sre-observer
+    trigger: always
+
+  - from: sre-observer
+    to: knowledge-curator
+    trigger: always
+
+  - from: release-executor
+    to: sre-observer
+    trigger: always
+
+error_handling:
+  decontamination:
+    on_node_failure: "snapshot the failure, isolate node-local state, do not carry it forward"
+    on_retry: "reload plan and catalog from source -- never reuse the context that failed"
+    max_error_chain: 3
+    after_max: "hard reset -- discard in-flight work and escalate with a clean report"
+
+failure_policy:
+  default:
+    retry: 2
+    backoff: exponential
+    fallback: escalate_to_human
+  per_node:
+    iac-builder:
+      retry: 2
+      backoff: exponential
+      fallback: escalate_to_human
+    sre-observer:
+      retry: 1
+      backoff: exponential
+      fallback: "escalate with the raw signal attached"
+    release-executor:
+      retry: 0
+      backoff: exponential
+      fallback: "pause and hold for a human gate"
+
+# Token ceilings. A node that blows the hard limit is stopped, because the
+# cause is almost always a full-workspace scan where an index lookup would do.
+evals:
+  per_node_warn: 50000
+  per_node_hard: 100000
+  per_run_hard: 500000
+
+governance:
+  ticket_required: false
+  ticket_pattern: "[A-Z][A-Z0-9]+-[0-9]+"
+  report_only_on_confirmed: true
+  knowledge_scope: [services, architecture, runbooks, contracts, policies]

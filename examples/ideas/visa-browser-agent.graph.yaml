@@ -1,0 +1,55 @@
+# Discovered by OpenCloudOps from /home/user/mcp-idea-publisher/ideas/visa-browser-agent.
+#
+# Owner and cost centre were supplied by a person -- discovery cannot infer
+# them. Everything else below was read out of the application itself.
+#
+# Evidence:
+#   files_read: Dockerfile, requirements.txt, browser_automator.py, server.py, README.md
+#   security: Dockerfile never leaves root -- the Kubernetes backend will enforce non-root anyway
+#   workload: headless browser automation -- sized larger and given a longer timeout
+#   compute: Dockerfile present -> compute.container_service
+apiVersion: opencloudops.dev/v1
+kind: ResourceGraph
+metadata:
+  name: visa-browser-agent
+  service: visabrowagen
+  owner: platform-team
+  cost_center: CC-1042
+  data_classification: restricted
+  environments:
+  - dev
+  - staging
+  - prod
+  source_idea: Discovered from /home/user/mcp-idea-publisher/ideas/visa-browser-agent
+spec:
+  nodes:
+  - id: network
+    type: net.vpc
+    description: Three-tier network for this service.
+    params:
+      cidr: 10.40.0.0/16
+      availability_zones: 2
+    exposure: private
+  - id: app
+    type: compute.container_service
+    description: The visa-browser-agent service.
+    params:
+      cpu: 1024
+      memory_mb: 2048
+      desired_count: 2
+      container_port: 8080
+      health_check_path: /health
+    exposure: internal
+  - id: observability
+    type: observability.stack
+    description: Logs, dashboard and SLO alarms.
+    params:
+      log_retention_days: 30
+    exposure: private
+  edges:
+  - from: app
+    to: network
+    relation: depends_on
+  - from: observability
+    to: app
+    relation: depends_on

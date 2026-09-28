@@ -1,0 +1,51 @@
+# Discovered by OpenCloudOps from /home/user/mcp-idea-publisher/ideas/music.
+#
+# Owner and cost centre were supplied by a person -- discovery cannot infer
+# them. Everything else below was read out of the application itself.
+#
+# Evidence:
+#   files_read: README.md, spec.md
+#   compute: no Dockerfile -> compute.function
+apiVersion: opencloudops.dev/v1
+kind: ResourceGraph
+metadata:
+  name: music
+  service: music
+  owner: platform-team
+  cost_center: CC-1042
+  data_classification: confidential
+  environments:
+  - dev
+  - staging
+  - prod
+  source_idea: Discovered from /home/user/mcp-idea-publisher/ideas/music
+spec:
+  nodes:
+  - id: network
+    type: net.vpc
+    description: Three-tier network for this service.
+    params:
+      cidr: 10.40.0.0/16
+      availability_zones: 2
+    exposure: private
+  - id: app
+    type: compute.function
+    description: The music entrypoint.
+    params:
+      runtime: python3.12
+      memory_mb: 512
+      timeout_seconds: 30
+    exposure: private
+  - id: observability
+    type: observability.stack
+    description: Logs, dashboard and SLO alarms.
+    params:
+      log_retention_days: 30
+    exposure: private
+  edges:
+  - from: app
+    to: network
+    relation: depends_on
+  - from: observability
+    to: app
+    relation: depends_on

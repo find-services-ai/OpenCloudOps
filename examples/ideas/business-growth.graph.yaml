@@ -1,0 +1,92 @@
+# Discovered by OpenCloudOps from /home/user/mcp-idea-publisher/ideas/business-growth.
+#
+# Owner and cost centre were supplied by a person -- discovery cannot infer
+# them. Everything else below was read out of the application itself.
+#
+# Evidence:
+#   files_read: Dockerfile, requirements.txt, __init__.py, server.py, IDEA.md, README.md
+#   security: Dockerfile drops to a non-root USER
+#   workload: headless browser automation -- sized larger and given a longer timeout
+#   compute: Dockerfile present -> compute.container_service
+#   dependency: 'sqlalchemy' -> store.relational node 'db'
+#   dependency: 'celery' -> queue.standard node 'jobs'
+#   dependency: 'ACCESS_TOKEN' -> secret.string node 'credentials'
+apiVersion: opencloudops.dev/v1
+kind: ResourceGraph
+metadata:
+  name: business-growth
+  service: busigrow
+  owner: platform-team
+  cost_center: CC-1042
+  data_classification: confidential
+  environments:
+  - dev
+  - staging
+  - prod
+  source_idea: Discovered from /home/user/mcp-idea-publisher/ideas/business-growth
+spec:
+  nodes:
+  - id: network
+    type: net.vpc
+    description: Three-tier network for this service.
+    params:
+      cidr: 10.40.0.0/16
+      availability_zones: 2
+    exposure: private
+  - id: app
+    type: compute.container_service
+    description: The business-growth service.
+    params:
+      cpu: 1024
+      memory_mb: 2048
+      desired_count: 2
+      container_port: 8080
+      health_check_path: /health
+    exposure: internal
+  - id: db
+    type: store.relational
+    description: Primary store. SQLite in the repository becomes a managed database in the cloud.
+    params:
+      multi_az: true
+      backup_retention_days: 14
+      database_name: busigrow
+    exposure: private
+    data_classification: confidential
+  - id: jobs
+    type: queue.standard
+    description: Async work handed off by the service.
+    params:
+      visibility_timeout_seconds: 60
+      max_receive_count: 3
+    exposure: private
+  - id: credentials
+    type: secret.string
+    description: Credentials for the external systems this service calls.
+    params:
+      rotation_days: 30
+    exposure: private
+  - id: observability
+    type: observability.stack
+    description: Logs, dashboard and SLO alarms.
+    params:
+      log_retention_days: 30
+    exposure: private
+  edges:
+  - from: app
+    to: network
+    relation: depends_on
+  - from: db
+    to: network
+    relation: depends_on
+  - from: app
+    to: db
+    relation: writes
+  - from: app
+    to: jobs
+    relation: publishes
+  - from: app
+    to: credentials
+    relation: reads
+  - from: observability
+    to: app
+    relation: depends_on

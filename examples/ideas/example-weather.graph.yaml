@@ -1,0 +1,64 @@
+# Discovered by OpenCloudOps from /home/user/mcp-idea-publisher/ideas/example-weather.
+#
+# Owner and cost centre were supplied by a person -- discovery cannot infer
+# them. Everything else below was read out of the application itself.
+#
+# Evidence:
+#   files_read: Dockerfile, package.json, README.md
+#   security: Dockerfile drops to a non-root USER
+#   compute: Dockerfile present -> compute.container_service
+#   dependency: 'API_KEY' -> secret.string node 'credentials'
+apiVersion: opencloudops.dev/v1
+kind: ResourceGraph
+metadata:
+  name: example-weather
+  service: examweat
+  owner: platform-team
+  cost_center: CC-1042
+  data_classification: confidential
+  environments:
+  - dev
+  - staging
+  - prod
+  source_idea: Discovered from /home/user/mcp-idea-publisher/ideas/example-weather
+spec:
+  nodes:
+  - id: network
+    type: net.vpc
+    description: Three-tier network for this service.
+    params:
+      cidr: 10.40.0.0/16
+      availability_zones: 2
+    exposure: private
+  - id: app
+    type: compute.container_service
+    description: The example-weather service.
+    params:
+      cpu: 512
+      memory_mb: 1024
+      desired_count: 2
+      container_port: 8080
+      health_check_path: /health
+    exposure: internal
+  - id: credentials
+    type: secret.string
+    description: Credentials for the external systems this service calls.
+    params:
+      rotation_days: 30
+    exposure: private
+  - id: observability
+    type: observability.stack
+    description: Logs, dashboard and SLO alarms.
+    params:
+      log_retention_days: 30
+    exposure: private
+  edges:
+  - from: app
+    to: network
+    relation: depends_on
+  - from: app
+    to: credentials
+    relation: reads
+  - from: observability
+    to: app
+    relation: depends_on

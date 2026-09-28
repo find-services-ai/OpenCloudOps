@@ -1,0 +1,23 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Runtime state, not source
+logs/
+memories/
+out/
+
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local overrides
+.env
+*.local.yaml
+
+.DS_Store

@@ -1,0 +1,13 @@
+.git
+.github
+tests
+out
+logs
+memories
+examples
+docs
+*.zip
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache

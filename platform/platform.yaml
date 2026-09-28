@@ -1,0 +1,105 @@
+# OpenCloudOps platform contract.
+#
+# This is the one file an organisation edits to make the framework theirs.
+# Every resource name, every mandatory tag, and every security check in
+# opencloudops/guard.py derives from what is written here -- so a change to the
+# baseline below changes what the agents will and will not emit, everywhere,
+# without touching a line of Python.
+#
+# Fields map 1:1 onto opencloudops.spec.PlatformContract. Anything the loader
+# does not recognise is a hard error, not a silently ignored key.
+
+org: fsa                      # 2-12 chars [a-z0-9]; first token of every name
+business_unit: plat
+default_provider: aws
+
+environments:
+  - name: dev
+    short: dv
+    region: us-east-1
+    production: false
+    approvers: []
+
+  - name: staging
+    short: stg
+    region: us-east-1
+    production: false
+    approvers: [platform-team]
+
+  - name: prod
+    short: prd
+    region: us-east-1
+    production: true
+    approvers: [platform-team, security-review]
+
+# ── Naming ────────────────────────────────────────────────────────────────
+# The type token ({abbrev}) is not decoration: without it a bucket and a queue
+# for the same component collide on one name. See learner.py's
+# `naming-with-resource-type` lesson, which fails the build if it goes missing.
+naming:
+  template: "{org}-{bu}-{env}-{service}-{component}-{abbrev}"
+  separator: "-"
+  max_length: 63
+  lowercase: true
+  overrides:
+    # S3 names are global, DNS-shaped, and may not carry the business unit
+    # prefix an org might later rename. Region keeps regional buckets distinct.
+    store.object: "{org}-{env}-{service}-{component}-{abbrev}"
+  abbreviations:
+    net.vpc: vpc
+    compute.function: fn
+    compute.container_service: svc
+    store.object: s3b
+    store.table: tbl
+    store.relational: rds
+    queue.standard: sqs
+    secret.string: sec
+    observability.stack: obs
+
+# ── Tagging ───────────────────────────────────────────────────────────────
+# Every required tag must be resolvable from graph metadata or from defaults.
+# A tag nothing can supply fails at resolve time rather than reaching the cloud.
+tagging:
+  required:
+    - Org
+    - BusinessUnit
+    - Environment
+    - Service
+    - Component
+    - Owner
+    - CostCenter
+    - DataClassification
+    - ManagedBy
+  defaults:
+    ManagedBy: opencloudops
+
+# ── Security baseline ─────────────────────────────────────────────────────
+# Each field below has a matching check in guard.py. tests/test_guard.py
+# asserts that correspondence, so adding a field here without adding a check
+# fails the suite instead of becoming a promise the framework does not keep.
+security:
+  encryption_at_rest_required: true
+  encryption_in_transit_required: true
+  customer_managed_keys_in: [prod]
+  deny_public_object_storage: true
+  deny_public_database: true
+  require_private_networking_for:
+    - store.relational
+    - compute.container_service
+  require_flow_logs: true
+  require_audit_logging: true
+  require_backups_in: [prod]
+  min_tls_version: "1.2"
+  max_secret_rotation_days: 90
+  allowed_regions: [us-east-1, us-west-2, eu-west-1]
+  forbid_wildcard_iam: true
+  require_observability_node: true
+
+# ── Autonomy ladder ───────────────────────────────────────────────────────
+# Mirrors the risk_gate values in agent-graph.yaml. LOW is what an agent may
+# do alone; HIGH is never granted by a flag, only by a recorded human approval.
+autonomy:
+  autonomous_up_to: LOW
+  approval_required_for: [MEDIUM]
+  human_only: [HIGH]
+  veto_window_minutes: 30

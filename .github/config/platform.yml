@@ -1,0 +1,159 @@
+# IaC Agent Platform — Master Configuration
+# Fill this file to configure your entire agentic deployment platform.
+# All agents, skills, and MCP servers derive their behavior from this config.
+
+platform:
+  name: "My Infrastructure Platform"
+  iac_tool: terraform                        # terraform | opentofu | pulumi | cdk | cloudformation
+  cloud: aws                                 # aws | gcp | azure | multi
+  repo_name: "my-infra-repo"
+  description: "Infrastructure-as-Code repository managed by AI agents"
+
+# ─── Environment Chain ───────────────────────────────────────────
+# Ordered from lowest to highest risk. The promotion path follows this order.
+environments:
+  - name: dev
+    branch: dev
+    account_id: "111111111111"
+    prefix: "d1"
+    risk_tier: LOW                           # LOW = agent acts autonomously
+    autonomous: true
+    profile: "my-aws-dev"
+    tfvars: "tfvars/dev.tfvars"
+
+  - name: staging
+    branch: staging
+    account_id: "222222222222"
+    prefix: "s1"
+    risk_tier: MEDIUM                        # MEDIUM = agent needs promotion approval
+    autonomous: false
+    profile: "my-aws-staging"
+    tfvars: "tfvars/staging.tfvars"
+
+  - name: prod
+    branch: prod
+    account_id: "333333333333"
+    prefix: "p1"
+    risk_tier: HIGH                          # HIGH = all changes need explicit human approval
+    autonomous: false
+    profile: "my-aws-prod"
+    tfvars: "tfvars/prod.tfvars"
+
+# ─── Compute Platform ────────────────────────────────────────────
+compute:
+  type: ecs_fargate                          # ecs_fargate | eks | lambda | ec2_asg | gke | aca
+  cluster_naming: "{app}-{prefix}-{service}-cluster"
+  service_naming: "{app}-{prefix}-{service}"
+  health_endpoint_pattern: "/health"
+  registry:
+    type: ecr                                # ecr | gcr | acr | dockerhub | ghcr
+    shared_account: "444444444444"           # Cross-account image pull (optional)
+    uri_pattern: "{account}.dkr.ecr.{region}.amazonaws.com/{repo}:{tag}"
+  image_source: tfvars                       # tfvars | versions_file | helm_values | ssm_parameter
+
+# ─── Streaming (optional) ────────────────────────────────────────
+# Remove this section entirely if your platform doesn't use streaming.
+streaming:
+  enabled: true
+  type: msk                                  # msk | kinesis | eventbridge | confluent | redpanda | pubsub
+  auth: iam                                  # iam | sasl_scram | mtls | api_key | oauth
+  port: 9098
+  topic_prefix: "{app}-{env}-"
+  dlq_suffix: "-dlq"
+  consumer_group_prefix: "{app}-{prefix}-"
+
+# ─── Database (optional) ─────────────────────────────────────────
+database:
+  enabled: true
+  type: rds_postgresql                       # rds_postgresql | rds_mysql | dynamodb | documentdb | cosmosdb
+  cluster_naming: "{app}-{prefix}-db"
+  iam_auth: true
+  schemas: []                                # List schema names for log correlation
+
+# ─── CI/CD ────────────────────────────────────────────────────────
+cicd:
+  type: codebuild                            # codebuild | github_actions | gitlab_ci | spacelift | atlantis
+  plan_project: "{repo}-{env}-plan"
+  apply_project: "{repo}-{env}-apply"
+  log_group: "/aws/codebuild/{repo}-{env}"
+  lead_time_seconds: 90                      # Time from push to build start
+
+# ─── Observability ────────────────────────────────────────────────
+observability:
+  apm:
+    type: newrelic                            # newrelic | datadog | grafana | xray
+    app_naming: "{app}-{prefix}-{service}"
+    query_language: nrql                      # nrql | promql | dql
+  logs:
+    type: cloudwatch                          # cloudwatch | gcp_logging | azure_monitor
+    group_pattern: "ecs/{app}/{service}/{prefix}"
+  log_aggregator:
+    type: opensearch                          # opensearch | elasticsearch | loki | none
+    index_pattern: "ecs-{app}-*"
+  dashboards:
+    auto_create: false                        # Whether to auto-create dashboards on deploy
+
+# ─── Issue Tracking ───────────────────────────────────────────────
+issue_tracking:
+  type: jira                                 # jira | linear | github_issues | azure_devops | shortcut
+  project_prefix: "PROJ"
+  ticket_pattern: "PROJ-\\d+"               # Regex for commit message enforcement
+  url: "https://your-org.atlassian.net"
+  commit_format: "{type}({ticket}): {description}"
+
+# ─── Naming Convention ────────────────────────────────────────────
+naming:
+  application: "my-app"
+  pattern: "{application}-{environment}-{service}"
+  # legacy_pattern: "{application}-{prefix}-{group}-{service}"  # Uncomment if migrating
+
+# ─── Deployment Policies ──────────────────────────────────────────
+# These drive the self-healing loop, HITL gates, and auto-remediation.
+policies:
+  timing:
+    settle_time:       { dev: 120, staging: 180, prod: 300 }
+    stability_window:  { dev: 300, staging: 600, prod: 900 }
+    poll_interval:     60
+    ci_lead_time:      90
+    fix_lead_time:     120
+
+  remediation:
+    max_attempts: 3
+    max_memory_bump_mb: 1024
+    max_cpu_bump_units: 512
+    rollback_age_limit_days: 7
+    known_bad_tag_block: HARD                # HARD | SOFT | DISABLED
+    same_error_retry: NEVER                  # NEVER | ONCE | UNLIMITED
+
+  confidence_matrix:
+    HIGH:   "Fix and re-enter loop"          # OOM → bump memory
+    MEDIUM: "Fix once, then escalate"        # 503 → wait + retry
+    LOW:    "Escalate immediately"           # Unknown errors, data corruption
+
+# ─── Env-Leak Detection ──────────────────────────────────────────
+# Auto-generated from environments section. Override for custom patterns.
+# Each env lists regex patterns that MUST NOT appear on that branch.
+leak_patterns:
+  # dev_must_not_contain:
+  #   - "222222222222"        # staging account
+  #   - "333333333333"        # prod account
+  #   - "prod-endpoint"
+  # prod_must_not_contain:
+  #   - "111111111111"        # dev account
+  #   - "222222222222"        # staging account
+  #   - "dev-endpoint"
+
+# ─── MCP Server Configuration ────────────────────────────────────
+mcp_servers:
+  cloud_logs:
+    enabled: true
+    env_vars: ["AWS_REGION", "AWS_PROFILE"]
+  issue_tracker:
+    enabled: true
+    env_vars: ["JIRA_URL", "JIRA_USERNAME", "ATLASSIAN_API_TOKEN"]
+  observability:
+    enabled: true
+    env_vars: ["NEW_RELIC_API_KEY", "NEW_RELIC_ACCOUNT_ID"]
+  log_aggregator:
+    enabled: true
+    env_vars: ["OPENSEARCH_ENDPOINT"]
