@@ -24,6 +24,7 @@ from rich.table import Table
 
 from opencloudops import __version__
 from opencloudops.agentgraph import AgentGraphSpec, NodeStatus
+from opencloudops.bootstrap.adapters import ADAPTER_NAMES
 from opencloudops.agents import PipelineDeps, build_runtime
 from opencloudops.audit import AuditLog
 from opencloudops.chatops import ChatOps
@@ -408,6 +409,76 @@ def logs(last: int = typer.Option(20, "--last")) -> None:
     """Tail the audit trail."""
     for event in AuditLog().tail(last):
         console.print(json.dumps(event))
+
+
+@app.command()
+def bootstrap(
+    target: Path = typer.Argument(..., help="Repository to scaffold OpenCloudOps into."),
+    agent: str = typer.Option("agnostic", "--agent", help="One of: " + ", ".join(ADAPTER_NAMES)),
+    overwrite: bool = typer.Option(False, "--overwrite", help="Replace files that already exist in target."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Print what would be written; write nothing."),
+) -> None:
+    """Scaffold this platform contract into another repo for one coding tool.
+
+    Writes AGENTS.md plus files in that tool's own format (CLAUDE.md +
+    .claude/commands/ for claude-code, .cursor/rules/ for cursor,
+    .github/agents/ for copilot, .continue/ for continue) -- all wired to
+    the occ CLI, none of it granting an apply capability that doesn't exist.
+
+    Every tool gets one file per node in agent-graph.yaml: the graph is the
+    source of truth, not a hand-authored copy of it.
+    """
+    from opencloudops.bootstrap.sdk import Bootstrap
+
+    if agent not in ADAPTER_NAMES:
+        console.print(f"[red]Unknown agent {agent!r}.[/red] Choose from: {', '.join(ADAPTER_NAMES)}")
+        raise typer.Exit(2)
+
+    b = Bootstrap(_deps().platform, target_dir=target, agent=agent, overwrite=overwrite)
+
+    if dry_run:
+        for path, content in sorted(b.dry_run().items()):
+            console.print(f"\n[bold]{path}[/bold] ({len(content)} bytes)")
+        return
+
+    conflicts = b.validate()
+    if conflicts and not overwrite:
+        console.print(f"[red]{len(conflicts)} file(s) already exist in {target}:[/red]")
+        for c in conflicts:
+            console.print(f"  {c}")
+        console.print("[dim]Pass --overwrite to replace them, or --dry-run to preview first.[/dim]")
+        raise typer.Exit(1)
+
+    written = b.run()
+    console.print(f"[green]Wrote {len(written)} file(s) to {target}[/green] (agent: {agent})")
+    for path in written:
+        console.print(f"  {path}")
+
+
+@app.command(name="validate-graph")
+def validate_graph(
+    path: Path = typer.Argument(Path("agent-graph.yaml"), help="Graph file to validate."),
+) -> None:
+    """Check agent-graph.yaml against structure (Pydantic) and safety
+    invariants (bootstrap.graph_invariants) -- the same two checks a bad
+    graph would fail at load time or at scaffold time, run standalone so a
+    hand edit can be checked before either."""
+    from opencloudops.bootstrap.graph_invariants import graph_invariant_errors
+
+    try:
+        spec = AgentGraphSpec.load(path)
+    except Exception as e:
+        console.print(f"[red]Structurally invalid:[/red] {e}")
+        raise typer.Exit(1) from None
+
+    errors = graph_invariant_errors(spec)
+    if errors:
+        console.print(f"[red]{len(errors)} safety invariant violation(s) in {path}:[/red]")
+        for e in errors:
+            console.print(f"  - {e}")
+        raise typer.Exit(1)
+
+    console.print(f"[green]Valid.[/green] {path} -- {len(spec.nodes)} nodes, structure and safety invariants both pass.")
 
 
 def main() -> None:

@@ -81,6 +81,29 @@ field with no check behind it fails the suite, not just a review.
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for how the pieces fit
 together and why the boundaries are where they are.
 
+## Scaffold into any repo, for any coding tool
+
+`occ bootstrap` puts this framework's `occ` CLI in front of five different
+coding tools — not just Claude Code:
+
+```bash
+occ bootstrap ../some-service-repo --agent claude-code   # .claude/agents/*.md ×6, CLAUDE.md
+occ bootstrap ../some-service-repo --agent cursor        # .cursor/rules/*.mdc ×6
+occ bootstrap ../some-service-repo --agent copilot       # .github/agents/*.agent.md ×6
+occ bootstrap ../some-service-repo --agent continue      # .continue/rules/*.md ×6 + config.json
+occ bootstrap ../some-service-repo --agent agnostic      # AGENTS.md only
+```
+
+Every tool gets **one file per node in `agent-graph.yaml`** — the graph is
+the single source of truth, so a change to a node's zone, tools, or risk
+gate changes what gets scaffolded everywhere without a second file to keep
+in sync. `occ validate-graph agent-graph.yaml` checks the graph's structure
+and a set of safety invariants (no write tool on a node this design calls
+read-only, no node ships `HIGH`, every repair loop is bounded, every node
+is reachable from the entry point, token budgets are ordered) before
+anything is scaffolded from it. See
+[`opencloudops/bootstrap/`](opencloudops/bootstrap/).
+
 ## Claude Code plugin
 
 This repo is also a Claude Code plugin marketplace. Install it in any
@@ -178,17 +201,28 @@ grounding, guarding, and all five emitters, in all three environments.
   against the generated HCL, a container that must come up non-root and
   report `/ready`, and `helm lint` on two configurations.
 
-## Prior art, vendored
+## Prior art, vendored and ported
 
-`.github/agents/`, `.github/skills/`, `.github/instructions/`, and
-`.github/knowledge/` are the prompt-driven Copilot/Claude agent definitions
-this project started from — a framework that turned a coding agent chat
-into an IaC/SRE assistant via markdown instructions and MCP tool contracts.
-They're kept as reference and as a complementary, conversational way to
-drive the same platform contract and knowledge base; the executable engine
-in `opencloudops/` does not depend on them and supersedes their runtime
-role. `adapters/` documents the `platform.yml` shape for three concrete
-infrastructure stacks from that earlier design.
+This project started from a prompt-driven Copilot/Claude framework that
+turned a coding-agent chat into an IaC/SRE assistant via markdown
+instructions and MCP tool contracts, later evolved into
+[egen/junction](https://github.com/egen/junction). Two things were
+carried forward deliberately, not just referenced:
+
+- **`opencloudops/bootstrap/`** ports that project's `agent_adapters/`
+  system faithfully: the same five adapter names, the same per-tool file
+  formats, corrected against junction's "one file per graph node" model
+  rather than the original's coarser per-tool summary. `graph_invariants.py`
+  ports the category of safety checks junction's `graph_schema.py` enforces
+  (a JSON Schema plus explicit invariants), adapted to this framework's own
+  node names and its "nothing ships HIGH" design.
+- **`.github/agents/`, `.github/skills/`, `.github/instructions/`, and
+  `.github/knowledge/`** are the original's prompt-driven definitions,
+  kept as reference. `adapters/` documents the `platform.yml` shape for
+  three concrete infrastructure stacks from that earlier design. Neither
+  is depended on by `opencloudops/`, which supersedes their runtime role
+  with an executing engine rather than a set of instructions for a human
+  to interpret.
 
 ## License
 

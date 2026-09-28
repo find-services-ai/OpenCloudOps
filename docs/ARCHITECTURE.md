@@ -131,3 +131,39 @@ ChatOps's command grammar is deliberately small and has no model in the
 parsing path: `<verb> [target] [--flag value]`. The one place that would be
 catastrophic to get probabilistically right is approval — `approve
 iac-builder` has to mean exactly one thing, every time.
+
+## A fourth surface: scaffolding into someone else's repo
+
+The three surfaces above assume `occ` runs inside a repo that already has
+`agent-graph.yaml`, `platform/platform.yaml`, and `patterns/`. Most repos
+don't — they're an existing service that needs OpenCloudOps pointed at it.
+`opencloudops/bootstrap/` is that path: `occ bootstrap <target> --agent
+<tool>` writes the files a given coding tool (Claude Code, Cursor, Copilot,
+Continue.dev, or a plain `AGENTS.md`) needs to route its own work through
+`occ`, without vendoring the engine into the target repo.
+
+`opencloudops/bootstrap/agent_specs.py::build_agent_specs()` turns the
+already-loaded `AgentGraphSpec` into one `AgentFileSpec` per node — role,
+zone, tools, model, risk gate, and a `read_only` flag derived from whether
+the node's tool list can write anything, not asserted separately. Every
+adapter in `opencloudops/bootstrap/adapters/` renders **one file per graph
+node** in its tool's native format (`.claude/agents/<node>.md`,
+`.cursor/rules/<node>.mdc`, `.github/agents/<node>.agent.md`,
+`.continue/rules/<node>.md`) from those specs. There is deliberately no
+second, hand-authored copy of each agent's responsibilities sitting
+alongside the graph — editing a node's `description`, `zone`, or `tools` in
+`agent-graph.yaml` changes every tool's scaffolded output the next time
+`occ bootstrap` runs, because the graph is what got rendered, not a
+description of it someone has to remember to update.
+
+`opencloudops/bootstrap/graph_invariants.py` is the check that makes a
+graph edit safe to scaffold from. `AgentGraphSpec` loading already enforces
+*structure* (zone disjointness, edges pointing at real nodes, a parseable
+risk gate); `graph_invariant_errors()` enforces *policy over that
+structure* — a node this design calls read-only has no write-capable tool,
+no node is gated `HIGH` (nothing here applies anything, so nothing needs
+that gate), the `iac-builder → iac-validator` must-pass gate exists, its
+repair loop back is bounded, every node is reachable from the entry point,
+and token budgets are ordered. `occ validate-graph` runs this standalone,
+so a hand edit to the graph can be checked before it is loaded by anything
+else.
