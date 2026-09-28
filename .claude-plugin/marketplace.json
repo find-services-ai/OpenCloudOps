@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "opencloudops-plugins",
+  "owner": {
+    "name": "find-services-ai",
+    "url": "https://github.com/find-services-ai"
+  },
+  "description": "Claude Code plugins for OpenCloudOps -- agentic cloud operations grounded in an approved pattern catalog and guarded by an enforced security baseline.",
+  "plugins": [
+    {
+      "name": "opencloudops",
+      "source": "./plugin/opencloudops",
+      "description": "Ground infrastructure in an approved pattern catalog, guard it against an enforced security baseline, emit IaC in five languages, and derive the SRE setup -- through the occ CLI. Proposes only; never applies.",
+      "category": "infrastructure",
+      "tags": ["iac", "sre", "terraform", "kubernetes", "platform-engineering"]
+    }
+  ]
+}

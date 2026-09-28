@@ -81,6 +81,25 @@ field with no check behind it fails the suite, not just a review.
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for how the pieces fit
 together and why the boundaries are where they are.
 
+## Claude Code plugin
+
+This repo is also a Claude Code plugin marketplace. Install it in any
+project to get `/opencloudops:plan`, `iac`, `guard`, `slo`, `diagnose`,
+`catalog`, `setup`, a `cloud-architect` subagent for end-to-end requests, an
+auto-invoked skill that steers Claude toward grounded/guarded IaC instead of
+freehand Terraform, and an advisory hook that runs `occ guard` after you
+edit a `*.graph.yaml`:
+
+```
+/plugin marketplace add find-services-ai/OpenCloudOps
+/plugin install opencloudops@opencloudops-plugins
+```
+
+The plugin wraps the `occ` CLI (see [Quickstart](#quickstart) below) rather
+than vendoring the engine — `/opencloudops:setup` checks for it and walks
+through installing it if it's missing. See
+[`plugin/opencloudops/`](plugin/opencloudops/) for the plugin's own layout.
+
 ## Quickstart
 
 ```bash
