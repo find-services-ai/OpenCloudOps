@@ -1,0 +1,115 @@
+name: CI
+
+# Canonical CI -- identical in every find-services-ai repo. It discovers what
+# to run instead of being configured per repo, so a repo with no tests simply
+# runs fewer jobs. Edit it in one place and copy it everywhere.
+#
+#   workflows  every workflow file parses and passes actionlint (this is the
+#              check that would have caught a YAML-invalid workflow, which
+#              GitHub reports only as a run with zero jobs)
+#   discover   finds Python test roots (a tests/ dir with test_*.py) and Node
+#              projects (package.json with a "test" script)
+#   python     pytest per root, e2e-marked tests excluded
+#   node       npm test per project
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  workflows:
+    name: Lint workflows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: actionlint
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color
+
+  discover:
+    name: Discover projects
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.find.outputs.python }}
+      node: ${{ steps.find.outputs.node }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: find
+        shell: python
+        run: |
+          import json, os
+          skip = {".git", "node_modules", ".venv", "venv", "dist", "build", "__pycache__", "ideas"}
+          py, node = [], []
+          for root, dirs, files in os.walk("."):
+              dirs[:] = [d for d in dirs if d not in skip and not d.startswith(".")]
+              rel = os.path.normpath(root)
+              if "package.json" in files:
+                  scripts = json.load(open(os.path.join(root, "package.json"))).get("scripts", {})
+                  if "test" in scripts:
+                      node.append(rel)
+              tests = os.path.join(root, "tests")
+              if os.path.isdir(tests) and any(
+                  f.startswith("test_") and f.endswith(".py") for f in os.listdir(tests)
+              ):
+                  py.append(rel)
+          print("python:", py)
+          print("node:", node)
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"python={json.dumps(py)}\nnode={json.dumps(node)}\n")
+
+  python:
+    name: pytest (${{ matrix.dir }})
+    needs: discover
+    if: needs.discover.outputs.python != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: ${{ fromJSON(needs.discover.outputs.python) }}
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.dir }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip pytest pytest-asyncio
+          for f in requirements*.txt; do [ -f "$f" ] && pip install -r "$f"; done
+          if [ -f pyproject.toml ]; then pip install -e ".[dev]" || pip install -e .; fi
+      - name: Test
+        run: python -m pytest -m "not e2e" -q
+
+  node:
+    name: npm test (${{ matrix.dir }})
+    needs: discover
+    if: needs.discover.outputs.node != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: ${{ fromJSON(needs.discover.outputs.node) }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.dir }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install
+        run: if [ -f package-lock.json ]; then npm ci; else npm install; fi
+      - name: Test
+        run: npm test
