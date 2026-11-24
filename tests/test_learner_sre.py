@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from opencloudops.learner import DETECTORS, LESSONS, Learner, LessonSeverity, Memory
+from opencloudops.learner import DETECTORS, LESSONS, Learner, Memory
+from opencloudops.spec import RiskTier
 from opencloudops.sre import ERROR_PATTERNS, derive_slos, diagnose, propose, runbook
 from opencloudops.sre.patterns import Confidence
 from opencloudops.sre.slo import dashboard
-from opencloudops.spec import RiskTier
 
 
 class TestLessonRegistry:

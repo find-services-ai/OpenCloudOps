@@ -24,7 +24,8 @@ from typing import Any
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from opencloudops import __version__, telemetry as otel
+from opencloudops import __version__
+from opencloudops import telemetry as otel
 from opencloudops.agentgraph import AgentGraphSpec, NodeStatus
 from opencloudops.agents import PipelineDeps, build_runtime, load_requested_graph
 from opencloudops.audit import AuditLog
@@ -35,6 +36,7 @@ from opencloudops.graph import load_platform, to_mermaid
 from opencloudops.ground import PatternCatalog
 from opencloudops.learner import Learner
 from opencloudops.spec import ResolvedPlan
+
 
 def _path(var: str, default: str) -> Path:
     """Resolved per call, not at import.

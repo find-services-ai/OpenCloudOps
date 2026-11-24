@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 ADAPTER_NAMES = ["copilot", "cursor", "claude-code", "continue", "agnostic"]
 
 
-def get_adapter(agent: str) -> "AgentAdapter":
+def get_adapter(agent: str) -> AgentAdapter:
     agent = agent.lower()
     if agent == "copilot":
         from opencloudops.bootstrap.adapters.copilot import CopilotAdapter

@@ -62,7 +62,7 @@ class AgentFileSpec:
     def mcp_servers(self) -> list[str]:
         return sorted({MCP_TOOL_TO_SERVER[t] for t in self.tools if t in MCP_TOOL_TO_SERVER})
 
-    def body(self, all_specs: list["AgentFileSpec"]) -> str:
+    def body(self, all_specs: list[AgentFileSpec]) -> str:
         """The operating instructions shared by every tool's rendering."""
         others = ", ".join(s.name for s in all_specs if s.name != self.name)
         lines = [

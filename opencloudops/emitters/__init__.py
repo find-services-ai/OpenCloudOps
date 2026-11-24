@@ -9,18 +9,18 @@ That split is what makes five backends maintainable: a naming change or a new
 security control is one edit in the core, not five edits in five templates.
 """
 
-from opencloudops.emitters.base import (  # noqa: F401
-    EMITTERS,
-    Emitter,
-    available,
-    get_emitter,
-)
 from opencloudops.emitters import (  # noqa: F401
     cdk_typescript,
     cloudformation,
     kubernetes,
     pulumi_python,
     terraform,
+)
+from opencloudops.emitters.base import (  # noqa: F401
+    EMITTERS,
+    Emitter,
+    available,
+    get_emitter,
 )
 
 __all__ = ["Emitter", "EMITTERS", "get_emitter", "available"]

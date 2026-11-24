@@ -21,11 +21,10 @@ lesson you will apply inconsistently.
 
 from __future__ import annotations
 
-import json
 import os
 import re
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 
@@ -463,7 +462,7 @@ JUNCTION_QUESTIONS: list[dict[str, str]] = [
 class Memory(BaseModel):
     """Something this installation learned. Written at incident close."""
 
-    ts: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    ts: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     service: str
     environment: str
     symptom: str
