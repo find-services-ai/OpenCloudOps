@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from opencloudops.graph import GraphError, dependency_map, resolve, topological_order
-from opencloudops.ground import GroundingError, PatternCatalog
+from opencloudops.ground import GroundingError
 from opencloudops.naming import NamingError, logical_id, resource_name, tf_identifier
 from opencloudops.spec import (
     EnvironmentSpec,

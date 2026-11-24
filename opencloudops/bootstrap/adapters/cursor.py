@@ -10,7 +10,7 @@ from __future__ import annotations
 from opencloudops.agentgraph import AgentGraphSpec
 from opencloudops.bootstrap.adapters._base import AgentAdapter
 from opencloudops.bootstrap.adapters._shared import env_chain, env_table_rows
-from opencloudops.bootstrap.agent_specs import NEVER_CLAIM_APPLIED, build_agent_specs
+from opencloudops.bootstrap.agent_specs import build_agent_specs
 from opencloudops.spec import PlatformContract
 
 

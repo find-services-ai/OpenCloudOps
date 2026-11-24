@@ -20,7 +20,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-
 from typing import TYPE_CHECKING
 
 from opencloudops.spec import PlatformContract
@@ -35,7 +34,7 @@ class AgentAdapter(ABC):
     name: str = "base"
 
     @abstractmethod
-    def generate_files(self, platform: PlatformContract, graph: "AgentGraphSpec | None" = None) -> dict[str, str]:
+    def generate_files(self, platform: PlatformContract, graph: AgentGraphSpec | None = None) -> dict[str, str]:
         """Return {target-relative path: content}.
 
         ``graph`` defaults to loading ``agent-graph.yaml`` from the current
@@ -50,7 +49,7 @@ class AgentAdapter(ABC):
         self,
         platform: PlatformContract,
         target_dir: Path,
-        graph: "AgentGraphSpec | None" = None,
+        graph: AgentGraphSpec | None = None,
         overwrite: bool = False,
     ) -> list[str]:
         from opencloudops.bootstrap.scaffold import write_files
@@ -68,5 +67,5 @@ class AgnosticAdapter(AgentAdapter):
 
     name = "agnostic"
 
-    def generate_files(self, platform: PlatformContract, graph: "AgentGraphSpec | None" = None) -> dict[str, str]:
+    def generate_files(self, platform: PlatformContract, graph: AgentGraphSpec | None = None) -> dict[str, str]:
         return {}

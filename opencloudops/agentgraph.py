@@ -172,8 +172,8 @@ class AgentGraphSpec(BaseModel):
                         "Zones must be disjoint -- two agents owning one concern is how they collide."
                     )
                 seen[zone] = name
-        for name, node in self.nodes.items():
-            node.gate_tier  # raises on an unparseable risk_gate
+        for node in self.nodes.values():
+            _ = node.gate_tier  # raises on an unparseable risk_gate
         return self
 
     @classmethod

@@ -21,11 +21,10 @@ this project would otherwise have to keep in sync with it.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from opencloudops.bootstrap.adapters import get_adapter
 from opencloudops.bootstrap.scaffold import append_gitignore, collect_files, write_files
-from typing import TYPE_CHECKING
-
 from opencloudops.spec import PlatformContract
 
 if TYPE_CHECKING:
@@ -54,7 +53,7 @@ class Bootstrap:
         platform: PlatformContract,
         target_dir: str | Path = ".",
         agent: str = "agnostic",
-        graph: "AgentGraphSpec | None" = None,
+        graph: AgentGraphSpec | None = None,
         overwrite: bool = False,
     ) -> None:
         self._platform = platform

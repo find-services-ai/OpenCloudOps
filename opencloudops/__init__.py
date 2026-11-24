@@ -14,8 +14,8 @@ __version__ = "0.1.0"
 
 from opencloudops.spec import (  # noqa: F401
     PlatformContract,
-    ResourceGraph,
     ResolvedPlan,
+    ResourceGraph,
     RiskTier,
 )
 

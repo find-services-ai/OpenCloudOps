@@ -30,7 +30,6 @@ from opencloudops.spec import (
     Exposure,
     NodeType,
     PlatformContract,
-    ResolvedNode,
     ResolvedPlan,
     RiskTier,
 )

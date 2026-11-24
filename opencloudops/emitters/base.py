@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 
 from opencloudops.spec import NodeType, PlatformContract, ResolvedNode, ResolvedPlan
 
-EMITTERS: dict[str, type["Emitter"]] = {}
+EMITTERS: dict[str, type[Emitter]] = {}
 
 
 class EmitterError(Exception):

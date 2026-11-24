@@ -99,8 +99,10 @@ provider "aws" {
             "}",
             "",
             'variable "environment" {',
-            "  description = \"Environment name. One variable, never two -- a second env",
-            "  variable is how cross-environment leaks stop being detectable.\"",
+            # One variable, never two: a second env variable is how
+            # cross-environment leaks stop being detectable. HCL quoted strings
+            # cannot span lines, so the description stays on one.
+            '  description = "Environment name (one variable per environment artifact)"',
             "  type        = string",
             f'  default     = "{plan.environment}"',
             "}",

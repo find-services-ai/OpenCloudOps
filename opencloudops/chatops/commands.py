@@ -23,9 +23,7 @@ from pydantic import BaseModel, Field
 from opencloudops.agentgraph import AgentGraphSpec, AgentRun, NodeStatus
 from opencloudops.agents import PipelineDeps, build_runtime
 from opencloudops.emitters import available
-from opencloudops.ground import PatternCatalog
-from opencloudops.learner import JUNCTION_QUESTIONS, Memory
-from opencloudops.spec import PlatformContract
+from opencloudops.learner import JUNCTION_QUESTIONS
 
 
 class Command(BaseModel):
@@ -293,7 +291,7 @@ class ChatOps:
         if "ticket" in opts:
             payload["ticket"] = opts["ticket"]
         languages = opts.get("lang") or opts.get("language")
-        payload["languages"] = [l.strip() for l in languages.split(",")] if languages else ["terraform"]
+        payload["languages"] = [lang.strip() for lang in languages.split(",")] if languages else ["terraform"]
         return payload
 
     def _run(self, command: Command) -> ChatReply:

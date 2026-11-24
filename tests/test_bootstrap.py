@@ -4,8 +4,6 @@ for five coding tools, and the graph safety invariants that back it.
 
 from __future__ import annotations
 
-import copy
-
 import pytest
 import yaml
 

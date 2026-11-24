@@ -23,16 +23,16 @@ from rich.syntax import Syntax
 from rich.table import Table
 
 from opencloudops import __version__
+from opencloudops import telemetry as otel
 from opencloudops.agentgraph import AgentGraphSpec, NodeStatus
-from opencloudops.bootstrap.adapters import ADAPTER_NAMES
 from opencloudops.agents import PipelineDeps, build_runtime
 from opencloudops.audit import AuditLog
+from opencloudops.bootstrap.adapters import ADAPTER_NAMES
 from opencloudops.chatops import ChatOps
 from opencloudops.emitters import available
 from opencloudops.graph import load_platform
 from opencloudops.ground import PatternCatalog
 from opencloudops.learner import Learner
-from opencloudops import telemetry as otel
 
 app = typer.Typer(
     add_completion=False,
