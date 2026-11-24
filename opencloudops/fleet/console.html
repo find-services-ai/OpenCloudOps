@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mission Control</title>
+<style>
+:root{
+  --bg:#f6f7f9;--panel:#fff;--ink:#14171c;--muted:#5d6673;--line:#e2e5ea;
+  --ok:#1f8a4c;--busy:#2563eb;--warn:#b7791f;--bad:#c53030;--off:#8a93a0;--you:#9333ea;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0f1216;--panel:#171b21;--ink:#e7eaee;--muted:#9aa3ae;--line:#262c34;
+  --ok:#3fb871;--busy:#6aa0ff;--warn:#e0a84a;--bad:#f06a6a;--off:#6b7480;--you:#c084fc;}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:baseline;justify-content:space-between;padding:16px;border-bottom:1px solid var(--line);background:var(--panel)}
+h1{font-size:18px;margin:0}
+.sub{color:var(--muted);font-size:13px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:12px;color:var(--muted)}
+main{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;padding:16px}
+@media (max-width:900px){main{grid-template-columns:1fr}}
+.practice{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
+.practice h2{font-size:14px;margin:0 0 2px}
+.practice p{margin:0 0 10px;color:var(--muted);font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.bot{border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.bot .top{display:flex;gap:8px;align-items:center}
+.dot{width:9px;height:9px;border-radius:50%;flex:none;background:var(--off)}
+.s-working .dot{background:var(--busy)} .s-idle .dot{background:var(--ok)}
+.s-late .dot{background:var(--warn)} .s-silent .dot{background:var(--bad)}
+.s-needs-you .dot{background:var(--you)} .s-stub .dot{background:transparent;border:1px dashed var(--off)}
+.name{font-weight:600;font-size:13px}
+.status{margin-left:auto;font-size:11px;color:var(--muted)}
+.doing{margin-top:4px;font-size:12px}
+.meta{margin-top:4px;font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+aside section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
+aside h2{font-size:14px;margin:0 0 8px}
+.move{border-left:3px solid var(--you);padding:4px 0 6px 10px;margin-bottom:10px}
+.move.t-investigate{border-color:var(--bad)} .move.t-wire-up{border-color:var(--busy)} .move.t-tidy{border-color:var(--off)}
+.move .t{font-weight:600;font-size:13px} .move .w{font-size:12px;color:var(--muted)}
+.ev{font-size:12px;padding:4px 0;border-bottom:1px solid var(--line)}
+.ev:last-child{border:0}
+.syn{font-size:10px;border:1px solid var(--warn);color:var(--warn);border-radius:4px;padding:0 4px;margin-left:4px}
+.err{color:var(--bad);font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1 id="firm">Mission Control</h1>
+    <div class="sub" id="offices"></div>
+  </div>
+  <div class="chips" id="summary"></div>
+</header>
+<main>
+  <div id="practices"></div>
+  <aside>
+    <section><h2>Next moves</h2><div id="moves"></div></section>
+    <section><h2>Latest activity</h2><div id="events"></div></section>
+  </aside>
+</main>
+<script>
+const LABEL={working:"Working",idle:"Idle",late:"Late",silent:"Silent","needs-you":"Needs you",
+  "never-reported":"Never reported",stub:"Not built"};
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const ago=m=>m==null?"":m<1?"just now":m<60?Math.round(m)+" min ago":m<1440?Math.round(m/60)+" h ago":Math.round(m/1440)+" d ago";
+async function j(u){const r=await fetch(u,{cache:"no-store"});if(!r.ok)throw new Error(u+" "+r.status);return r.json()}
+async function tick(){
+  try{
+    const [f,moves,evs]=await Promise.all([j("fleet"),j("fleet/next-moves"),j("fleet/events?limit=25")]);
+    document.getElementById("firm").textContent=f.firm.name+" · Mission Control";
+    document.getElementById("offices").textContent=f.offices.map(o=>o.name+" ("+o.city+")").join(" · ");
+    document.getElementById("summary").innerHTML=Object.entries(f.summary).map(([k,v])=>`<span class="chip">${esc(LABEL[k]||k)}: ${v}</span>`).join("");
+    document.getElementById("practices").innerHTML=f.practices.map(p=>{
+      const bots=f.bots.filter(b=>b.practice===p.id);
+      return `<div class="practice"><h2>${esc(p.name)}</h2><p>${esc(p.mandate)}</p><div class="grid">${bots.map(b=>`
+        <div class="bot s-${esc(b.status)}"><div class="top"><span class="dot"></span><span class="name">${esc(b.name)}</span>
+        <span class="status">${esc(LABEL[b.status]||b.status)}</span></div>
+        <div class="doing">${esc(b.doing)}${b.last_event&&b.last_event.synthetic?'<span class="syn">demo</span>':""}</div>
+        <div class="meta">${esc(b.autonomy)} · ${esc(b.repo.replace("find-services-ai/",""))}${b.age_minutes!=null?" · "+ago(b.age_minutes):""}</div></div>`).join("")}</div></div>`}).join("");
+    document.getElementById("moves").innerHTML=moves.length?moves.map(m=>`<div class="move t-${esc(m.type)}"><div class="t">${esc(m.title)}</div><div class="w">${esc(m.why)}</div></div>`).join(""):'<div class="w">Nothing waiting on you.</div>';
+    document.getElementById("events").innerHTML=evs.length?evs.map(e=>`<div class="ev"><b>${esc(e.agent||"unknown")}</b> ${esc(e.kind)}${e.synthetic?'<span class="syn">demo</span>':""}<br>${esc(e.summary)}<div class="meta">${esc(e.ts)}</div></div>`).join(""):'<div class="w">No events yet.</div>';
+  }catch(e){document.getElementById("moves").innerHTML=`<div class="err">Cannot reach the API: ${esc(e.message)}</div>`}
+}
+tick();setInterval(tick,5000);
+</script>
+</body>
+</html>
