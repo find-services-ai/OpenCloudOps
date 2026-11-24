@@ -25,6 +25,7 @@ COPY platform/ ./platform/
 COPY patterns/ ./patterns/
 COPY graphs/ ./graphs/
 COPY agent-graph.yaml ./agent-graph.yaml
+COPY firm/ ./firm/
 
 ENV PYTHONPATH=/app/deps:/app \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -35,6 +36,9 @@ ENV PYTHONPATH=/app/deps:/app \
     OCC_AGENT_GRAPH=/app/agent-graph.yaml \
     OCC_AUDIT_LOG=/app/logs/audit.jsonl \
     OCC_MEMORY_DIR=/app/memories \
+    OCC_FIRM=/app/firm/firm.yaml \
+    OCC_INVENTORY=/app/firm/inventory.yaml \
+    OCC_FLEET_LOG=/app/logs/fleet.jsonl \
     OTEL_SERVICE_NAME=opencloudops
 
 RUN mkdir -p /app/logs /app/memories && chown -R occ:occ /app/logs /app/memories

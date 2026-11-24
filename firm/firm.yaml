@@ -1,0 +1,289 @@
+# Axiom Ventures -- the firm, as OpenCloudOps Mission Control sees it.
+#
+# Modelled on how the large professional-services firms organise themselves:
+# a headquarters with an Office of the Managing Partner, offices by geography,
+# and practices (service lines) that own delivery. Every bot belongs to exactly
+# one practice and one office, has a human owner, and declares how much it may
+# do on its own. Nothing here grants a bot any power: autonomy is a label the
+# console displays, and the enforcement lives in the bot's own code
+# (OpenCloudOps' guard and gates, the gos harness's section-8 constraint gate).
+#
+# `maturity` comes from reading each repo's code and running its tests on
+# 2026-11-24 (see firm/inventory.yaml for the evidence), not from READMEs.
+#   works   -- runs, and its own test suite passes
+#   partial -- real code, but tests fail or a piece is missing
+#   stub    -- a README or a manifest with nothing behind it yet
+#
+# `heartbeat_minutes` is how often the bot should report while it is meant to
+# be running. A bot that has never reported shows as "never reported", which
+# is the truth until it is wired to POST /fleet/events.
+
+firm:
+  name: Axiom Ventures
+  tagline: Agentic consulting that ships
+  managing_partner: Gagan            # the one human approver in v1
+
+offices:
+  - id: hq-us
+    name: Headquarters (US LLC)
+    city: Naperville, IL
+    role: Client-facing entity. Contracts, billing, approvals, partner office.
+  - id: idc-in
+    name: India Delivery Centre
+    city: India
+    role: Delivery entity. Build, test and run engagements.
+  - id: edge-home
+    name: Home edge node
+    city: Naperville, IL (Raspberry Pi 5)
+    role: Always-on worker for scheduled bots and private data. Not client-facing.
+
+practices:
+  - id: mp-office
+    name: Office of the Managing Partner
+    lead: Gagan
+    mandate: Firm strategy, risk and quality, approvals. Every irreversible step stops here.
+  - id: advisory
+    name: AI & Data Advisory
+    lead: Gagan
+    mandate: Win and shape engagements. Proposals, SOWs, client advisory, demo MVPs.
+  - id: cloud-platform
+    name: Cloud & Platform Engineering
+    lead: Gagan
+    mandate: Grounded, guarded infrastructure and SRE for client and firm systems.
+  - id: trust-risk
+    name: Trust, Risk & Governance
+    lead: Gagan
+    mandate: Delegated authorization, PII handling, evaluation gates.
+  - id: ventures
+    name: Ventures & Industry Solutions
+    lead: Gagan
+    mandate: Productised solutions incubated from client problems.
+  - id: firm-ops
+    name: Firm Operations
+    lead: Gagan
+    mandate: Keep the firm itself running. Infra, knowledge, people.
+
+bots:
+  # -- Office of the Managing Partner --------------------------------------
+  - id: gos-harness
+    name: GOS Harness (registry and eval gate)
+    practice: mp-office
+    office: hq-us
+    repo: find-services-ai/ethos
+    path: harness/
+    maturity: works
+    autonomy: propose-only
+    heartbeat_minutes: 60
+    does: Registers every bot, gates versions on evals, enforces the no-trade, no-payment rules.
+  - id: pr-tribunal
+    name: PR Tribunal
+    practice: mp-office
+    office: hq-us
+    repo: find-services-ai/ethos
+    path: harness/gos/tribunal.py (open PR #10, not merged)
+    maturity: partial
+    autonomy: read-only
+    heartbeat_minutes: 1440
+    does: Keeps only review findings backed by checkable evidence; blocks on surviving critical findings.
+
+  # -- AI & Data Advisory ---------------------------------------------------
+  - id: client-advisor
+    name: Client Advisor
+    practice: advisory
+    office: hq-us
+    repo: find-services-ai/mcp-idea-publisher
+    path: agents/client-advisor.md
+    maturity: partial
+    autonomy: draft-for-approval
+    heartbeat_minutes: 1440
+    does: Turns a client conversation into the problem, the stakes and the next question.
+  - id: sow-architect
+    name: SOW Architect
+    practice: advisory
+    office: hq-us
+    repo: find-services-ai/mcp-idea-publisher
+    path: agents/sow-architect.md
+    maturity: partial
+    autonomy: draft-for-approval
+    heartbeat_minutes: 1440
+    does: Drafts statements of work with scope, milestones and acceptance criteria.
+  - id: proposal-reviewer
+    name: Proposal Reviewer
+    practice: advisory
+    office: hq-us
+    repo: find-services-ai/mcp-idea-publisher
+    path: agents/proposal-reviewer.md
+    maturity: partial
+    autonomy: read-only
+    heartbeat_minutes: 1440
+    does: Red-teams a proposal before it goes to a client.
+  - id: mvp-bootstrap
+    name: MVP Bootstrap
+    practice: advisory
+    office: idc-in
+    repo: find-services-ai/mvp-monorepo
+    path: bootstrap/ and demos/
+    maturity: partial
+    autonomy: draft-for-approval
+    heartbeat_minutes: 1440
+    does: Builds a small, runnable proof of one claim from a client proposal.
+
+  # -- Cloud & Platform Engineering (OpenCloudOps agent graph) --------------
+  - id: occ-orchestrator
+    name: OpenCloudOps Orchestrator
+    practice: cloud-platform
+    office: idc-in
+    repo: find-services-ai/OpenCloudOps
+    path: agent-graph.yaml#orchestrator
+    maturity: works
+    autonomy: propose-only
+    heartbeat_minutes: 60
+    does: Takes an infrastructure request, asks the junction questions, dispatches.
+  - id: occ-iac-builder
+    name: IaC Builder
+    practice: cloud-platform
+    office: idc-in
+    repo: find-services-ai/OpenCloudOps
+    path: agent-graph.yaml#iac-builder
+    maturity: works
+    autonomy: propose-only
+    heartbeat_minutes: 60
+    does: Resolves a graph against the approved pattern catalog and renders IaC in five languages.
+  - id: occ-iac-validator
+    name: IaC Validator
+    practice: cloud-platform
+    office: idc-in
+    repo: find-services-ai/OpenCloudOps
+    path: agent-graph.yaml#iac-validator
+    maturity: works
+    autonomy: read-only
+    heartbeat_minutes: 60
+    does: Enforces the security baseline and the learned anti-patterns; bounded repair.
+  - id: occ-sre-observer
+    name: SRE Observer
+    practice: cloud-platform
+    office: idc-in
+    repo: find-services-ai/OpenCloudOps
+    path: agent-graph.yaml#sre-observer
+    maturity: works
+    autonomy: read-only
+    heartbeat_minutes: 15
+    does: Derives SLOs and burn-rate alerts, diagnoses signals, proposes remediation.
+  - id: occ-release-executor
+    name: Release Executor
+    practice: cloud-platform
+    office: idc-in
+    repo: find-services-ai/OpenCloudOps
+    path: agent-graph.yaml#release-executor
+    maturity: works
+    autonomy: propose-only
+    heartbeat_minutes: 60
+    does: Writes the change record. A person applies it; it holds no credentials.
+
+  # -- Trust, Risk & Governance ---------------------------------------------
+  - id: opendelegate
+    name: OpenDelegate
+    practice: trust-risk
+    office: idc-in
+    repo: find-services-ai/OpenDelegate
+    path: README.md only on main; design on design/pii-redaction-review
+    maturity: stub
+    autonomy: read-only
+    heartbeat_minutes: 1440
+    does: Scoped, revocable authorization for agent-to-agent delegation.
+  - id: pii-redactor
+    name: PII Redaction Gateway
+    practice: trust-risk
+    office: idc-in
+    repo: find-services-ai/finetune-llm
+    path: research/plan/
+    maturity: stub
+    autonomy: read-only
+    heartbeat_minutes: 1440
+    does: Research and design only. Inline PII redaction for LLM traffic.
+
+  # -- Ventures & Industry Solutions ----------------------------------------
+  - id: find-buyers-ai
+    name: find.buyers.ai
+    practice: ventures
+    office: idc-in
+    repo: find-services-ai/find.buyers.ai
+    path: Next.js app
+    maturity: works
+    autonomy: draft-for-approval
+    heartbeat_minutes: 1440
+    does: B2B buyer discovery SaaS dashboard.
+  - id: amazon-seller-ops
+    name: Amazon Seller Ops
+    practice: ventures
+    office: idc-in
+    repo: find-services-ai/amazon-seller-agentic-workflow
+    path: backend/ and dashboard/
+    maturity: partial
+    autonomy: draft-for-approval
+    heartbeat_minutes: 1440
+    does: Product research, supplier discovery and outreach drafts for an FBA seller.
+  - id: surplus-engine
+    name: Surplus & Rescue Engine
+    practice: ventures
+    office: idc-in
+    repo: find-services-ai/food-wastage
+    path: surplus_engine/
+    maturity: works
+    autonomy: propose-only
+    heartbeat_minutes: 1440
+    does: Predicts grocery surplus and routes it to markdown, donation or an ordering fix.
+  - id: dao-digest
+    name: DAO Digest
+    practice: ventures
+    office: idc-in
+    repo: find-services-ai/ethos
+    path: harness/agents/dao-digest/
+    maturity: works
+    autonomy: read-only
+    heartbeat_minutes: 1440
+    does: Read-only DAO governance and treasury digest. No keys, no signing path.
+  - id: pet-grooming
+    name: Pet Grooming Marketplace
+    practice: ventures
+    office: idc-in
+    repo: find-services-ai/pet-gromming-uber-model
+    path: README.md only
+    maturity: stub
+    autonomy: read-only
+    heartbeat_minutes: 1440
+    does: Idea only.
+
+  # -- Firm Operations --------------------------------------------------------
+  - id: agentos-core
+    name: AgentOS Core (planner, executor, channels)
+    practice: firm-ops
+    office: idc-in
+    repo: find-services-ai/mcp-idea-publisher
+    path: app/, core/, control/
+    maturity: partial
+    autonomy: draft-for-approval
+    heartbeat_minutes: 60
+    does: Routes goals to domain packs; Telegram and WhatsApp control channels.
+  - id: home-nas-ops
+    name: Home NAS Ops
+    practice: firm-ops
+    office: edge-home
+    repo: find-services-ai/pi5-home-nas
+    path: docker-compose.yml
+    maturity: partial
+    autonomy: read-only
+    heartbeat_minutes: 60
+    does: Nextcloud and backup stack on the Pi 5.
+
+  # -- Partner's personal lane (kept out of client work) --------------------
+  - id: antigravity
+    name: Antigravity Trading Research
+    practice: mp-office
+    office: edge-home
+    repo: find-services-ai/ai-trading-assistant
+    path: services/agents/
+    maturity: partial
+    autonomy: read-only
+    heartbeat_minutes: 1440
+    does: Market research swarm. Personal lane. Never places orders.

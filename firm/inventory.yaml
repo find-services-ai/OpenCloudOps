@@ -1,0 +1,98 @@
+# Repo ground truth for Mission Control's "next move" panel.
+#
+# Every state below comes from cloning the repo's default branch and running
+# its own tests (or build) on the date in `checked`, not from its README.
+# Re-run the checks before acting on any line: this file is a dated snapshot.
+checked: "2026-11-24"
+method: shallow clone of the default branch, install declared deps, run its test suite or build
+repos:
+  - repo: find-services-ai/OpenCloudOps
+    line: platform
+    state: broken
+    evidence: >-
+      main holds only OpenCloudOps.zip, and the zip cannot be opened: 41,545 of its
+      212,520 bytes are the UTF-8 replacement character, the mark of a binary file
+      saved as text. The real framework is on branch
+      claude/opencloudops-agentic-framework-unseh8: 366 tests pass, 1 fails (generated
+      examples are stale).
+    action: Merge the framework branch into main and drop the damaged zip
+    urgent: true
+  - repo: find-services-ai/ethos
+    line: internal-agents
+    state: works
+    evidence: >-
+      GOS harness (registry, eval gate, versioner, Cloud Run promote): 100 tests pass,
+      1 skipped. Four open PRs; #10 (tribunal + Mission Control events) merges clean,
+      #6, #7 and #8 have conflicts.
+    action: Review PR #10; it is what feeds this console
+  - repo: find-services-ai/mcp-idea-publisher
+    line: internal-agents
+    state: partial
+    evidence: AgentOS core plus the consulting agents. 111 tests pass, 1 fails (channel loader count 13 vs 10).
+    action: ""
+  - repo: find-services-ai/mvp-monorepo
+    line: client-delivery
+    state: partial
+    evidence: >-
+      One demo (conga-data-sync-semantic-layer). Its pinned dependency pgserver==0.1.4
+      is not on the package index, so it does not install; tests not run.
+    action: Repin or vendor pgserver so the client demo installs
+  - repo: find-services-ai/find.buyers.ai
+    line: ventures
+    state: works
+    evidence: Next.js app. 10 of 10 vitest tests pass. Production build not run here.
+    action: ""
+  - repo: find-services-ai/amazon-seller-agentic-workflow
+    line: ventures
+    state: partial
+    evidence: >-
+      Dashboard builds (vite). Backend test run did not start here (jest not found
+      after install). Public repo carries backend/users.json with 7 accounts, real-looking
+      email addresses and bcrypt password hashes.
+    action: Remove users.json from this public repo and rotate those passwords
+    urgent: true
+  - repo: find-services-ai/food-wastage
+    line: ventures
+    state: works
+    evidence: Surplus engine. 20 of 20 tests pass.
+    action: ""
+  - repo: find-services-ai/ai-trading-assistant
+    line: personal
+    state: partial
+    evidence: 23 tests pass, 5 fail, 13 error (mocked quotes compared as numbers). Research only.
+    action: ""
+  - repo: find-services-ai/pi5-home-nas
+    line: internal-agents
+    state: partial
+    evidence: Docker compose for Nextcloud plus two scripts, no tests. More work on claude/pi-offgrid-nas-pihole-k76f5x.
+    action: ""
+  - repo: find-services-ai/OpenDelegate
+    line: platform
+    state: stub
+    evidence: main is a one-line README. Design work sits on design/pii-redaction-review.
+    action: Decide whether OpenDelegate gets built next or parked
+  - repo: find-services-ai/finetune-llm
+    line: platform
+    state: stub
+    evidence: PII-redaction research and plan only; one synthetic workload script.
+    action: ""
+  - repo: find-services-ai/pet-gromming-uber-model
+    line: ventures
+    state: stub
+    evidence: README and content config only.
+    action: Park or archive the pet-grooming idea
+  - repo: find-services-ai/virtuosity
+    line: personal
+    state: stub
+    evidence: README only.
+    action: ""
+  - repo: find-services-ai/find-quantum-ai
+    line: personal
+    state: stub
+    evidence: README only. Quantum work lives in ethos PR #6.
+    action: ""
+  - repo: find-services-ai/leetcode
+    line: archive
+    state: dead
+    evidence: README only; last commit 2025-07-10.
+    action: Archive leetcode
