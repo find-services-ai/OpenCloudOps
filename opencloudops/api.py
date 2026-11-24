@@ -30,8 +30,8 @@ from opencloudops.agentgraph import AgentGraphSpec, NodeStatus
 from opencloudops.agents import PipelineDeps, build_runtime, load_requested_graph
 from opencloudops.audit import AuditLog
 from opencloudops.chatops import ChatOps
-from opencloudops.fleet.routes import router as fleet_router
 from opencloudops.emitters import available, get_emitter
+from opencloudops.fleet.routes import router as fleet_router
 from opencloudops.graph import load_platform, to_mermaid
 from opencloudops.ground import PatternCatalog
 from opencloudops.learner import Learner
