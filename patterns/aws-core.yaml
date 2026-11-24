@@ -1,0 +1,309 @@
+# OpenCloudOps pattern catalog -- AWS core.
+#
+# This file is the *grounding surface*. An agent may only emit infrastructure
+# described here. Adding a pattern is a reviewed act: the `controls` list is
+# what guard.py trusts when it checks the security baseline, so a pattern that
+# claims a control it does not actually render is a security defect, not a typo.
+#
+# Field notes:
+#   controls  -- security properties the rendered resource is guaranteed to have
+#   params    -- the ONLY knobs a graph node may set (unknown keys are refused)
+#   slo       -- the starting point the SRE agent derives alerts and SLOs from
+#   emits     -- concrete resource kinds, for the plan summary and cost review
+
+- id: aws-vpc-3tier
+  provider: aws
+  node_type: net.vpc
+  summary: >
+    Three-tier VPC: public subnets for load balancers only, private subnets for
+    compute, isolated subnets for data. NAT egress, flow logs to CloudWatch.
+  status: approved
+  controls:
+    - flow-logs-enabled
+    - private-subnets-only
+    - audit-logging-enabled
+    - no-default-security-group-rules
+  params:
+    cidr:
+      type: string
+      default: "10.0.0.0/16"
+      description: "VPC CIDR block. Must not overlap any peered network."
+    availability_zones:
+      type: int
+      default: 2
+      allowed: [2, 3]
+      description: "AZ spread. Two is the minimum the baseline accepts."
+    single_nat_gateway:
+      type: bool
+      default: false
+      description: "Cost saving for non-production only; the guard blocks it in prod."
+  slo:
+    availability_pct: 99.99
+  emits: [aws_vpc, aws_subnet, aws_nat_gateway, aws_route_table, aws_flow_log]
+
+- id: aws-lambda-function
+  provider: aws
+  node_type: compute.function
+  summary: >
+    VPC-attached Lambda function with a dedicated execution role, structured
+    logging, X-Ray tracing and a dead-letter queue.
+  status: approved
+  controls:
+    - encryption-at-rest-kms
+    - encryption-in-transit-tls
+    - private-subnets-only
+    - least-privilege-iam
+    - audit-logging-enabled
+    - tracing-enabled
+  params:
+    runtime:
+      type: string
+      default: python3.12
+      allowed: [python3.12, python3.11, nodejs20.x, java21, provided.al2023]
+    memory_mb:
+      type: int
+      default: 512
+      description: "128-10240. The guard warns above 3008 (usually a code smell)."
+    timeout_seconds:
+      type: int
+      default: 30
+    reserved_concurrency:
+      type: int
+      default: 0
+      description: "0 means unreserved. Production public endpoints should set this."
+    handler:
+      type: string
+      default: "app.handler"
+  slo:
+    availability_pct: 99.9
+    latency_p95_ms: 800
+  emits: [aws_lambda_function, aws_iam_role, aws_cloudwatch_log_group, aws_sqs_queue]
+
+- id: aws-ecs-fargate-service
+  provider: aws
+  node_type: compute.container_service
+  summary: >
+    ECS Fargate service in private subnets behind an internal ALB, with a
+    task role separated from the execution role, container insights, and
+    rolling deploys gated on a health check.
+  status: approved
+  controls:
+    - encryption-in-transit-tls
+    - private-subnets-only
+    - least-privilege-iam
+    - audit-logging-enabled
+    - no-exec-command
+    - read-only-root-filesystem
+  params:
+    cpu:
+      type: int
+      default: 512
+      allowed: [256, 512, 1024, 2048, 4096]
+    memory_mb:
+      type: int
+      default: 1024
+      allowed: [512, 1024, 2048, 4096, 8192, 16384]
+    desired_count:
+      type: int
+      default: 2
+      description: "The guard blocks a single task in production."
+    container_port:
+      type: int
+      default: 8080
+    health_check_path:
+      type: string
+      default: "/health"
+    image:
+      type: string
+      default: ""
+      description: "Full registry URI:tag. Left empty, the emitter writes a variable."
+  slo:
+    availability_pct: 99.9
+    latency_p95_ms: 400
+  emits: [aws_ecs_service, aws_ecs_task_definition, aws_lb, aws_iam_role, aws_cloudwatch_log_group]
+
+- id: aws-s3-private-bucket
+  provider: aws
+  node_type: store.object
+  summary: >
+    Private S3 bucket: all four public-access blocks on, KMS encryption,
+    versioning, TLS-only bucket policy, access logging and lifecycle rules.
+  status: approved
+  controls:
+    - encryption-at-rest-kms
+    - encryption-in-transit-tls
+    - block-public-access
+    - versioning-enabled
+    - audit-logging-enabled
+  params:
+    versioning:
+      type: bool
+      default: true
+    lifecycle_expire_days:
+      type: int
+      default: 0
+      description: "0 disables expiry. Set for log and scratch buckets."
+    object_lock:
+      type: bool
+      default: false
+      description: "Write-once storage for records with a retention obligation."
+  slo:
+    availability_pct: 99.99
+  emits: [aws_s3_bucket, aws_s3_bucket_public_access_block, aws_kms_key, aws_s3_bucket_policy]
+
+- id: aws-dynamodb-table
+  provider: aws
+  node_type: store.table
+  summary: >
+    DynamoDB table with KMS encryption, point-in-time recovery and on-demand
+    billing by default.
+  status: approved
+  controls:
+    - encryption-at-rest-kms
+    - encryption-in-transit-tls
+    - backups-enabled
+    - least-privilege-iam
+  params:
+    partition_key:
+      type: string
+      required: true
+      description: "Attribute name of the hash key."
+    sort_key:
+      type: string
+      default: ""
+    billing_mode:
+      type: string
+      default: PAY_PER_REQUEST
+      allowed: [PAY_PER_REQUEST, PROVISIONED]
+    ttl_attribute:
+      type: string
+      default: ""
+    stream:
+      type: bool
+      default: false
+  slo:
+    availability_pct: 99.99
+    latency_p95_ms: 50
+  emits: [aws_dynamodb_table, aws_kms_key]
+
+- id: aws-rds-postgres
+  provider: aws
+  node_type: store.relational
+  summary: >
+    RDS PostgreSQL in isolated subnets, IAM database authentication, KMS
+    storage encryption, automated backups, deletion protection and enforced TLS.
+  status: approved
+  controls:
+    - encryption-at-rest-kms
+    - encryption-in-transit-tls
+    - private-subnets-only
+    - backups-enabled
+    - deletion-protection
+    - audit-logging-enabled
+    - iam-database-auth
+  params:
+    engine_version:
+      type: string
+      default: "16.4"
+    instance_class:
+      type: string
+      default: db.t4g.medium
+    allocated_storage_gb:
+      type: int
+      default: 50
+    multi_az:
+      type: bool
+      default: false
+      description: "The guard blocks single-AZ in production."
+    backup_retention_days:
+      type: int
+      default: 7
+    database_name:
+      type: string
+      default: appdb
+  slo:
+    availability_pct: 99.95
+    latency_p95_ms: 100
+  emits: [aws_db_instance, aws_db_subnet_group, aws_security_group, aws_kms_key]
+
+- id: aws-sqs-queue
+  provider: aws
+  node_type: queue.standard
+  summary: >
+    SQS queue with a matching dead-letter queue, KMS encryption and a
+    TLS-only access policy.
+  status: approved
+  controls:
+    - encryption-at-rest-kms
+    - encryption-in-transit-tls
+    - dead-letter-queue
+    - least-privilege-iam
+  params:
+    visibility_timeout_seconds:
+      type: int
+      default: 30
+    message_retention_seconds:
+      type: int
+      default: 345600
+    max_receive_count:
+      type: int
+      default: 5
+      description: "Redrive threshold before a message lands in the DLQ."
+    fifo:
+      type: bool
+      default: false
+  slo:
+    availability_pct: 99.9
+    freshness_minutes: 5
+  emits: [aws_sqs_queue, aws_kms_key]
+
+- id: aws-secrets-manager-secret
+  provider: aws
+  node_type: secret.string
+  summary: >
+    Secrets Manager secret with a customer-managed key, automatic rotation
+    and a lifecycle rule that stops IaC from ever overwriting the value.
+  status: approved
+  controls:
+    - encryption-at-rest-kms
+    - secret-rotation
+    - least-privilege-iam
+    - ignore-value-drift
+  params:
+    rotation_days:
+      type: int
+      default: 30
+      description: "The guard blocks anything above the baseline maximum."
+    description:
+      type: string
+      default: "Managed by OpenCloudOps"
+  slo:
+    availability_pct: 99.99
+  emits: [aws_secretsmanager_secret, aws_kms_key, aws_secretsmanager_secret_rotation]
+
+- id: aws-cloudwatch-observability
+  provider: aws
+  node_type: observability.stack
+  summary: >
+    The service's observability stack: log group with retention, a dashboard,
+    SLO-derived alarms and an SNS topic for alert delivery.
+  status: approved
+  controls:
+    - encryption-at-rest-kms
+    - audit-logging-enabled
+    - alerting-enabled
+  params:
+    log_retention_days:
+      type: int
+      default: 30
+      allowed: [1, 7, 14, 30, 60, 90, 180, 365, 400, 545, 731, 1827, 3653]
+    alarm_email:
+      type: string
+      default: ""
+      description: "Left empty, the emitter writes a variable for the subscription."
+    dashboard:
+      type: bool
+      default: true
+  slo:
+    availability_pct: 99.9
+  emits: [aws_cloudwatch_log_group, aws_cloudwatch_dashboard, aws_cloudwatch_metric_alarm, aws_sns_topic]

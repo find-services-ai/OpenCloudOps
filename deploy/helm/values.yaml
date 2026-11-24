@@ -1,0 +1,84 @@
+# The chart's defaults are the safe ones. Everything that would widen the
+# service's reach -- an ingress, a service account with cloud permissions, a
+# writable filesystem -- is off unless you turn it on deliberately.
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/find-services-ai/opencloudops
+  tag: ""          # defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8081
+
+# Off by default. This service answers questions about infrastructure; putting
+# it on the public internet is a decision, not a default.
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts: []
+  tls: []
+
+serviceAccount:
+  create: true
+  name: ""
+  # Deliberately empty. OpenCloudOps has no apply path and needs no cloud
+  # permissions. An IRSA/Workload Identity annotation here would grant reach
+  # the application cannot use and an attacker could.
+  annotations: {}
+  automountServiceAccountToken: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+# Your own platform contract, pattern catalog, graphs and agent graph. Supply
+# them as a ConfigMap and the image becomes yours without a rebuild.
+config:
+  # Name of an existing ConfigMap holding platform.yaml, agent-graph.yaml and
+  # the pattern/graph files. Empty uses whatever was baked into the image.
+  existingConfigMap: ""
+
+telemetry:
+  # Where traces go. Empty keeps spans in-process: the service still works and
+  # still reports a request id, it just has nowhere to send the spans.
+  otlpEndpoint: ""
+  serviceName: opencloudops
+  deployEnvironment: kubernetes
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+networkPolicy:
+  # Default-deny with named exceptions. Without this a compromised pod anywhere
+  # in the cluster can reach this service.
+  enabled: true
+  # Namespaces permitted to call it. Empty means the release namespace only.
+  allowedNamespaces: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

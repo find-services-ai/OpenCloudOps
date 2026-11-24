@@ -1,0 +1,72 @@
+# Discovered by OpenCloudOps from /home/user/mcp-idea-publisher/ideas/client-management.
+#
+# Owner and cost centre were supplied by a person -- discovery cannot infer
+# them. Everything else below was read out of the application itself.
+#
+# Evidence:
+#   files_read: Dockerfile, requirements.txt, __init__.py, server.py, IDEA.md, README.md
+#   port: Dockerfile EXPOSE/ENV -> 8102
+#   health: Dockerfile HEALTHCHECK -> /health
+#   security: Dockerfile drops to a non-root USER
+#   compute: Dockerfile present -> compute.container_service
+#   dependency: 'sqlite3' -> store.relational node 'db'
+apiVersion: opencloudops.dev/v1
+kind: ResourceGraph
+metadata:
+  name: client-management
+  service: cliemana
+  owner: platform-team
+  cost_center: CC-1042
+  data_classification: confidential
+  environments:
+  - dev
+  - staging
+  - prod
+  source_idea: Discovered from /home/user/mcp-idea-publisher/ideas/client-management
+spec:
+  nodes:
+  - id: network
+    type: net.vpc
+    description: Three-tier network for this service.
+    params:
+      cidr: 10.40.0.0/16
+      availability_zones: 2
+    exposure: private
+  - id: app
+    type: compute.container_service
+    description: The client-management service.
+    params:
+      cpu: 512
+      memory_mb: 1024
+      desired_count: 2
+      container_port: 8102
+      health_check_path: /health
+    exposure: internal
+  - id: db
+    type: store.relational
+    description: Primary store. SQLite in the repository becomes a managed database in the cloud.
+    params:
+      multi_az: true
+      backup_retention_days: 14
+      database_name: cliemana
+    exposure: private
+    data_classification: confidential
+  - id: observability
+    type: observability.stack
+    description: Logs, dashboard and SLO alarms.
+    params:
+      log_retention_days: 30
+    exposure: private
+  edges:
+  - from: app
+    to: network
+    relation: depends_on
+  - from: db
+    to: network
+    relation: depends_on
+  - from: app
+    to: db
+    relation: writes
+  - from: observability
+    to: app
+    relation: depends_on

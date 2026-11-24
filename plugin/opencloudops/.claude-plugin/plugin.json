@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin.json",
+  "name": "opencloudops",
+  "displayName": "OpenCloudOps",
+  "version": "0.1.0",
+  "description": "Ground infrastructure in an approved pattern catalog, guard it against an enforced security baseline, emit IaC in five languages, and derive the SRE setup -- all through the occ CLI. Proposes only; never applies.",
+  "author": {
+    "name": "find-services-ai",
+    "url": "https://github.com/find-services-ai/OpenCloudOps"
+  },
+  "homepage": "https://github.com/find-services-ai/OpenCloudOps",
+  "repository": "https://github.com/find-services-ai/OpenCloudOps",
+  "license": "MIT",
+  "keywords": [
+    "iac",
+    "sre",
+    "terraform",
+    "cloudformation",
+    "pulumi",
+    "cdk",
+    "kubernetes",
+    "platform-engineering",
+    "opentelemetry"
+  ],
+  "defaultEnabled": true
+}

@@ -1,0 +1,15 @@
+# CODEOWNERS
+# Global owner — reviews all changes
+* @gagan-shangari-egenai
+
+# Core agent definitions
+.github/agents/ @gagan-shangari-egenai
+
+# Core skills — changes here affect all users of the template
+.github/skills/_core/ @gagan-shangari-egenai
+
+# Deployment policies — governance changes need careful review
+.github/knowledge/deployment-policies.md @gagan-shangari-egenai
+
+# Platform config schema
+.github/config/ @gagan-shangari-egenai

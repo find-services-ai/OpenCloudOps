@@ -1,0 +1,121 @@
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install
+        run: python -m pip install -e ".[all]"
+
+      - name: Lint
+        run: python -m ruff check opencloudops tests scripts
+
+      - name: Test
+        run: python -m pytest tests/ -q
+
+      - name: Check the shipped contracts actually load
+        # A platform.yaml or pattern file that stops parsing breaks every user
+        # of the framework, so it is checked here rather than discovered on a
+        # first run.
+        run: |
+          python -m opencloudops.cli version
+          python -m opencloudops.cli list patterns
+          python -m opencloudops.cli guard reference-web-service --env prod
+
+      - name: Emit every backend, for every environment
+        run: |
+          for env in dev staging prod; do
+            for lang in terraform cloudformation pulumi-python cdk-typescript kubernetes; do
+              python -m opencloudops.cli iac reference-web-service --env "$env" --language "$lang"
+            done
+          done
+
+  terraform-validate:
+    # The unit tests check the generated HCL's shape. This checks that
+    # Terraform itself accepts it, which is a different and stronger claim.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.5"
+          terraform_wrapper: false
+      - run: python -m pip install -e ".[all]"
+      - name: Emit and validate
+        run: |
+          python -m opencloudops.cli iac reference-web-service --env prod \
+            --language terraform --out out/tf --approve iac-builder
+          cd out/tf/terraform
+          terraform init -backend=false -input=false
+          terraform validate
+          terraform fmt -check -diff || echo "::warning::generated HCL is not gofmt-clean"
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: opencloudops:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: The container must come up and report ready
+        run: |
+          docker run -d --name occ -p 8081:8081 opencloudops:ci
+          for i in $(seq 1 30); do
+            if curl -fsS localhost:8081/ready; then break; fi
+            sleep 2
+          done
+          curl -fsS localhost:8081/ready | tee /dev/stderr | grep -q '"status":"ready"'
+      - name: It must run as a non-root user
+        run: |
+          test "$(docker exec occ id -u)" != "0"
+      - if: always()
+        run: docker rm -f occ || true
+
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: helm lint deploy/helm
+      - name: Render with defaults and with everything enabled
+        run: |
+          helm template occ deploy/helm > /dev/null
+          helm template occ deploy/helm \
+            --set autoscaling.enabled=true \
+            --set ingress.enabled=true \
+            --set ingress.hosts[0].host=occ.example.com \
+            --set telemetry.otlpEndpoint=http://collector:4318 > /dev/null

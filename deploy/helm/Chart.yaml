@@ -1,0 +1,10 @@
+apiVersion: v2
+name: opencloudops
+description: Agentic cloud operations -- grounded, guarded IaC and SRE setup from a resource graph.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords: [iac, sre, platform-engineering, ai-agents, opentelemetry]
+home: https://github.com/find-services-ai/OpenCloudOps
+sources:
+  - https://github.com/find-services-ai/OpenCloudOps

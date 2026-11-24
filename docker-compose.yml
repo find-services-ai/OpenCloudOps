@@ -1,0 +1,54 @@
+# The demo stack: the service, an OpenTelemetry collector, and Jaeger.
+#
+# The collector and Jaeger are here because "every agent request is one trace"
+# is a claim you should be able to check rather than take on faith. Bring this
+# up, run `make demo`, then open http://localhost:16686 and look at a request:
+# one span per agent node, carrying its zone, gate, repair cycle and token cost.
+
+services:
+  opencloudops:
+    build: .
+    image: opencloudops:local
+    ports:
+      - "8081:8081"
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: opencloudops
+      OCC_DEPLOY_ENV: compose
+    volumes:
+      # Your contracts, not the ones baked into the image.
+      - ./platform:/app/platform:ro
+      - ./patterns:/app/patterns:ro
+      - ./graphs:/app/graphs:ro
+      - ./agent-graph.yaml:/app/agent-graph.yaml:ro
+      - occ-logs:/app/logs
+      - occ-memories:/app/memories
+    depends_on:
+      - otel-collector
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.104.0
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./deploy/otel-collector.yaml:/etc/otel/config.yaml:ro
+    ports:
+      - "4318:4318"
+    depends_on:
+      - jaeger
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.58
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"
+
+volumes:
+  occ-logs:
+  occ-memories:

@@ -1,0 +1,21 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Write(**/*.graph.yaml)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/graph-guard-check.sh"
+          },
+          {
+            "type": "command",
+            "if": "Edit(**/*.graph.yaml)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/graph-guard-check.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

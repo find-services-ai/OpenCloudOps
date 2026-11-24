@@ -1,0 +1,112 @@
+# Reference graph: the shape most internal services actually take.
+# Copy this, change the metadata, keep the node types.
+apiVersion: opencloudops.dev/v1
+kind: ResourceGraph
+metadata:
+  name: reference-web-service
+  service: refsvc
+  owner: platform-team
+  cost_center: CC-0001
+  data_classification: internal
+  environments: [dev, staging, prod]
+  source_idea: "A containerised API with a relational store, async work, and object storage."
+
+spec:
+  nodes:
+    - id: network
+      type: net.vpc
+      description: Three-tier network the whole service lives in.
+      params:
+        cidr: 10.20.0.0/16
+        availability_zones: 2
+
+    - id: api
+      type: compute.container_service
+      description: The HTTP API.
+      exposure: internal
+      params:
+        cpu: 512
+        memory_mb: 1024
+        desired_count: 2
+        container_port: 8080
+        health_check_path: /health
+
+    - id: db
+      type: store.relational
+      description: Primary transactional store.
+      data_classification: confidential
+      params:
+        engine_version: "16.4"
+        multi_az: true
+        backup_retention_days: 14
+        database_name: refsvc
+
+    - id: jobs
+      type: queue.standard
+      description: Async work handed off by the API.
+      params:
+        visibility_timeout_seconds: 60
+        max_receive_count: 3
+
+    - id: worker
+      type: compute.function
+      description: Drains the job queue.
+      params:
+        runtime: python3.12
+        memory_mb: 512
+        timeout_seconds: 60
+
+    - id: artifacts
+      type: store.object
+      description: User-uploaded and generated files.
+      data_classification: confidential
+      params:
+        versioning: true
+        lifecycle_expire_days: 365
+
+    - id: db-credentials
+      type: secret.string
+      description: Application credentials for external systems.
+      params:
+        rotation_days: 30
+
+    - id: observability
+      type: observability.stack
+      description: Logs, dashboard and SLO alarms for the whole service.
+      params:
+        log_retention_days: 30
+
+  edges:
+    - from: api
+      to: network
+      relation: depends_on
+    - from: db
+      to: network
+      relation: depends_on
+    - from: worker
+      to: network
+      relation: depends_on
+    - from: api
+      to: db
+      relation: writes
+    - from: api
+      to: jobs
+      relation: publishes
+    - from: worker
+      to: jobs
+      relation: consumes
+    - from: worker
+      to: db
+      relation: writes
+    - from: api
+      to: artifacts
+      relation: writes
+    - from: api
+      to: db-credentials
+      relation: reads
+    - from: observability
+      to: api
+      relation: depends_on
+    - from: observability
+      to: worker
+      relation: depends_on
